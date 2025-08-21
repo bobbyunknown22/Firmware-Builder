@@ -28,8 +28,8 @@ jobs:
 
       - name: 1. Install Dependencies
         run: |
-            apt-get update
-            apt-get install -y --no-install-recommends lolcat pigz aria2 wget jq unrar p7zip-full
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends lolcat pigz aria2 wget jq unrar p7zip-full
 
       - name: 2. Run ULO Builder
         run: |
