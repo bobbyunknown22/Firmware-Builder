@@ -43,4 +43,17 @@ jobs:
           grep 'DOWNLOAD_CUSTOM' ulo
 
           echo "Menjalankan ULO Builder dan melewati pemilihan patch..."
-          echo "1" | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024
+          (echo "y"; echo "1") | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024
+
+      - name: List Kernel DTBs
+        run: |
+          echo "Finding all DTB files in ULO-Builder/core/kernel..."
+          find ULO-Builder/core/kernel -type f -name "*.dtb" > kernels.txt
+          echo "Kernel and DTB list:"
+          cat kernels.txt
+
+      - name: Upload Kernel List
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-list
+          path: kernels.txt
