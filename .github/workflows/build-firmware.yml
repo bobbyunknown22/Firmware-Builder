@@ -66,38 +66,15 @@ jobs:
           fi
 
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create and Upload Release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.target_device }}-${{ github.event.inputs.kernel_version }}-${{ github.run_number }}
-          release_name: "${{ github.event.inputs.target_device }} | ${{ github.event.inputs.kernel_version }} | #${{ github.run_number }}"
+          name: "${{ github.event.inputs.target_device }} | ${{ github.event.inputs.kernel_version }} | #${{ github.run_number }}"
           body: |
             Build otomatis firmware.
             - **Perangkat**: ${{ github.event.inputs.target_device }}
             - **Kernel**: ${{ github.event.inputs.kernel_version }}
             - **RootFS**: ${{ github.event.inputs.rootfs_filename }}
             - **Patch**: ${{ github.event.inputs.patch_filename || 'None' }}
-          draft: false
-          prerelease: false
-
-      - name: Prepare Artifact
-        id: artifact
-        run: |
-          mkdir -p output
-          FIRMWARE_PATH=$(find ./ULO-Builder/out -name "*.img.gz" -type f)
-          mv "$FIRMWARE_PATH" ./output/
-          FIRMWARE_FILENAME=$(ls output)
-          echo "FIRMWARE_FILENAME=$FIRMWARE_FILENAME" >> $GITHUB_OUTPUT
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./output/${{ steps.artifact.outputs.FIRMWARE_FILENAME }}
-          asset_name: ${{ steps.artifact.outputs.FIRMWARE_FILENAME }}
-          asset_content_type: application/gzip
+          files: ./ULO-Builder/out/**/*.img.gz
