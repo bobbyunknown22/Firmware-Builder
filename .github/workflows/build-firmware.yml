@@ -13,10 +13,13 @@ on:
         description: 'Kernel Version (e.g., 6.1.104-AW64-DBAI)'
         required: true
         default: '6.1.104-AW64-DBAI'
-      rootfs_url:
-        description: 'URL to the rootfs file'
+      rootfs_filename:
+        description: 'Rootfs filename (will be downloaded by ULO)'
         required: true
-        default: 'https://github.com/armarchindo/ULO-repository/raw/main/rootfs/openwrt-23.05.5-vanila-armsr-armv8-generic-ext4-rootfs.img.gz'
+        default: 'openwrt-23.05.5-vanila-armsr-armv8-generic-ext4-rootfs.img.gz'
+      jamu_number:
+        description: 'Optional: Jamu patch number to apply'
+        required: false
 
 jobs:
   build:
@@ -28,16 +31,21 @@ jobs:
 
       - name: Setup ULO-Builder
         run: |
-          git clone https://github.com/armarchindo/ULO-Builder.git
-          ROOTFS_FILENAME=$(basename "${{ github.event.inputs.rootfs_url }}")
-          echo "ROOTFS_FILENAME=$ROOTFS_FILENAME" >> $GITHUB_ENV
-          wget "${{ github.event.inputs.rootfs_url }}"
-          mkdir -p ULO-Builder/rootfs
-          mv "$ROOTFS_FILENAME" ULO-Builder/rootfs/
+          git clone https://github.com/bobbyunknown/ULO-Builder --branch dev --depth 1
+          echo "ROOTFS_FILENAME=${{ github.event.inputs.rootfs_filename }}" >> $GITHUB_ENV
 
       - name: Run ULO-Builder
         run: |
           cd ULO-Builder
-          # Enable custom kernel download
-          sed -i 's/DOWNLOAD_CUSTOM_KERNEL=false/DOWNLOAD_CUSTOM_KERNEL=true/' ulo
-          sudo ./ulo -m ${{ github.event.inputs.target_device }} -r ${{ env.ROOTFS_FILENAME }} -k ${{ github.event.inputs.kernel_version }} -s 1024
+          COMMAND="sudo ./ulo --custom-kernel --custom-rootfs"
+          COMMAND+=" -m ${{ github.event.inputs.target_device }}"
+          COMMAND+=" -r ${{ env.ROOTFS_FILENAME }}"
+          COMMAND+=" -k ${{ github.event.inputs.kernel_version }}"
+          COMMAND+=" -s 1024"
+
+          if [[ -n "${{ github.event.inputs.jamu_number }}" ]]; then
+            COMMAND+=" --jamu ${{ github.event.inputs.jamu_number }}"
+          fi
+
+          echo "Running command: $COMMAND"
+          eval $COMMAND
