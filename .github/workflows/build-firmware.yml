@@ -8,11 +8,11 @@ on:
       target_device:
         description: 'Target Device (e.g., s905x2, rk3328)'
         required: true
-        default: 's905x2'
+        default: 'h618-orangepi-zero3'
       kernel_version:
-        description: 'Kernel Version (e.g., 6.1.66-DBAI)'
+        description: 'Kernel Version (e.g., 6.1.104-AW64-DBAI)'
         required: true
-        default: '6.1.66-DBAI'
+        default: '6.1.104-AW64-DBAI'
       rootfs_url:
         description: 'URL to the rootfs file'
         required: true
@@ -26,36 +26,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: 1. Install Dependencies
+      - name: Setup ULO-Builder
         run: |
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends lolcat pigz aria2 wget jq unrar p7zip-full
-
-      - name: 2. Run ULO Builder
-        run: |
-          echo "Cloning ULO-Builder repository..."
           git clone https://github.com/armarchindo/ULO-Builder.git
+          ROOTFS_FILENAME=$(basename "${{ github.event.inputs.rootfs_url }}")
+          wget "${{ github.event.inputs.rootfs_url }}"
+          mkdir -p ULO-Builder/rootfs
+          mv "$ROOTFS_FILENAME" ULO-Builder/rootfs/
 
-          echo "Downloading rootfs from ${{ github.event.inputs.rootfs_url }}"
-          wget -O rootfs.img.gz "${{ github.event.inputs.rootfs_url }}"
-          ROOTFS_FILENAME="rootfs.img.gz"
-          
-          echo "Setting up ULO-Builder environment..."
-          cd ULO-Builder
-          mkdir -p rootfs
-          mv ../"$ROOTFS_FILENAME" ./rootfs/
-          chmod +x ./ulo
-
-          echo "Starting build process..."
-          # Menjalankan skrip ULO secara non-interaktif dengan sudo
-          sudo ./ulo \
-            -m "${{ github.event.inputs.target_device }}" \
-            -r "$ROOTFS_FILENAME" \
-            -k "${{ github.event.inputs.kernel_version }}" \
-            -s 1024 # Menggunakan ukuran default 1024
-
-      - name: 3. Upload Artifact to Release
+      - name: Run ULO-Builder
         run: |
-          echo "Build finished. Firmware is located in ULO-Builder/out/"
-          ls -R ULO-Builder/out/
-          # Langkah selanjutnya adalah mengunggah hasil build ke GitHub Releases
+          cd ULO-Builder
+          ./ulo -m ${{ github.event.inputs.target_device }} -r ${{ github.event.inputs.rootfs_url }} -k ${{ github.event.inputs.kernel_version }} -s 1024
+        
