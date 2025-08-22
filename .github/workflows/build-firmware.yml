@@ -17,9 +17,6 @@ on:
         description: 'Rootfs filename (will be downloaded by ULO)'
         required: true
         default: 'openwrt-23.05.5-vanila-armsr-armv8-generic-ext4-rootfs.img.gz'
-      jamu_number:
-        description: 'Optional: Jamu patch number to apply'
-        required: false
 
 jobs:
   build:
@@ -37,15 +34,13 @@ jobs:
       - name: Run ULO-Builder
         run: |
           cd ULO-Builder
-          COMMAND="sudo ./ulo --custom-kernel --custom-rootfs"
-          COMMAND+=" -m ${{ github.event.inputs.target_device }}"
-          COMMAND+=" -r ${{ env.ROOTFS_FILENAME }}"
-          COMMAND+=" -k ${{ github.event.inputs.kernel_version }}"
-          COMMAND+=" -s 1024"
+          
+          echo "Mengaktifkan unduhan kustom..."
+          sudo sed -i 's/DOWNLOAD_CUSTOM_KERNEL=false/DOWNLOAD_CUSTOM_KERNEL=true/' ulo
+          sudo sed -i 's/DOWNLOAD_CUSTOM_ROOTFS=false/DOWNLOAD_CUSTOM_ROOTFS=true/' ulo
 
-          if [[ -n "${{ github.event.inputs.jamu_number }}" ]]; then
-            COMMAND+=" --jamu ${{ github.event.inputs.jamu_number }}"
-          fi
+          echo "Verifikasi konfigurasi:"
+          grep 'DOWNLOAD_CUSTOM' ulo
 
-          echo "Running command: $COMMAND"
-          eval $COMMAND
+          echo "Menjalankan ULO Builder dan melewati pemilihan patch..."
+          echo "1" | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024
