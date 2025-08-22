@@ -47,12 +47,13 @@ jobs:
 
       - name: List Kernel DTBs
         run: |
-          echo "Finding all DTB files in ULO-Builder/core/kernel..."
+          cd ULO-Builder
+          echo "Mencari file .dtb di direktori ULO-Builder/core/kernel..."
           find ULO-Builder/core/kernel -type f -name "*.dtb" > kernels.txt
-          echo "Kernel and DTB list:"
+          echo "File .dtb yang ditemukan:"
           cat kernels.txt
 
-      - name: Upload Kernel List
+      - name: Upload Kernel List Artifact
         uses: actions/upload-artifact@v4
         with:
           name: kernel-list
