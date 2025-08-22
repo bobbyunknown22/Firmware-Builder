@@ -49,7 +49,7 @@ jobs:
         run: |
           cd ULO-Builder
           echo "Mencari file .dtb di direktori ULO-Builder/core/kernel..."
-          find ULO-Builder/core/kernel -type f -name "*.dtb" > kernels.txt
+          find core/kernel -type f -name "*.dtb" > kernels.txt
           echo "File .dtb yang ditemukan:"
           cat kernels.txt
 
