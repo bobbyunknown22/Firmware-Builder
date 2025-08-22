@@ -17,6 +17,10 @@ on:
         description: 'Rootfs filename (will be downloaded by ULO)'
         required: true
         default: 'openwrt-23.05.5-vanila-armsr-armv8-generic-ext4-rootfs.img.gz'
+      patch_filename:
+        description: 'Patch filename (optional, from ULO-Builder repo)'
+        required: false
+        default: ''
 
 jobs:
   build:
@@ -31,6 +35,12 @@ jobs:
           git clone https://github.com/bobbyunknown/ULO-Builder --branch dev --depth 1
           echo "ROOTFS_FILENAME=${{ github.event.inputs.rootfs_filename }}" >> $GITHUB_ENV
 
+      - name: Prepare Patch
+        if: github.event.inputs.patch_filename != ''
+        run: |
+          echo "Downloading patch: ${{ github.event.inputs.patch_filename }}"
+          wget -P ULO-Builder/patch/ https://raw.githubusercontent.com/armarchindo/ULO-Builder/main/patch/${{ github.event.inputs.patch_filename }}
+
       - name: Run ULO-Builder
         run: |
           cd ULO-Builder
@@ -42,5 +52,10 @@ jobs:
           echo "Verifikasi konfigurasi:"
           grep 'DOWNLOAD_CUSTOM' ulo
 
-          echo "Menjalankan ULO Builder dan melewati pemilihan patch..."
-          (echo "y"; echo "1") | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024
+          echo "Menjalankan ULO Builder..."
+          # Jawab 'y' untuk mengunduh rootfs tambahan, lalu pilih patch.
+          if [ -n "${{ github.event.inputs.patch_filename }}" ]; then
+            (echo "y"; echo "2") | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024
+          else
+            (echo "y"; echo "1") | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024
+          fi
