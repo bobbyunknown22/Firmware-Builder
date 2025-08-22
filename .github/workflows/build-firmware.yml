@@ -36,6 +36,7 @@ jobs:
 
       - name: Run ULO-Builder
         run: |
+          ROOTFS_FILENAME=$(basename "${{ github.event.inputs.rootfs_url }}")
           cd ULO-Builder
-          sudo ./ulo -m ${{ github.event.inputs.target_device }} -r ${{ github.event.inputs.rootfs_url }} -k ${{ github.event.inputs.kernel_version }} -s 1024
+          sudo ./ulo -m ${{ github.event.inputs.target_device }} -r $ROOTFS_FILENAME -k ${{ github.event.inputs.kernel_version }} -s 1024
         
