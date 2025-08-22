@@ -30,13 +30,13 @@ jobs:
         run: |
           git clone https://github.com/armarchindo/ULO-Builder.git
           ROOTFS_FILENAME=$(basename "${{ github.event.inputs.rootfs_url }}")
+          echo "ROOTFS_FILENAME=$ROOTFS_FILENAME" >> $GITHUB_ENV
           wget "${{ github.event.inputs.rootfs_url }}"
           mkdir -p ULO-Builder/rootfs
           mv "$ROOTFS_FILENAME" ULO-Builder/rootfs/
 
       - name: Run ULO-Builder
         run: |
-          ROOTFS_FILENAME=$(basename "${{ github.event.inputs.rootfs_url }}")
           cd ULO-Builder
-          sudo ./ulo -m ${{ github.event.inputs.target_device }} -r $ROOTFS_FILENAME -k ${{ github.event.inputs.kernel_version }} -s 1024
+          sudo ./ulo -m ${{ github.event.inputs.target_device }} -r ${{ env.ROOTFS_FILENAME }} -k ${{ github.event.inputs.kernel_version }} -s 1024
         
