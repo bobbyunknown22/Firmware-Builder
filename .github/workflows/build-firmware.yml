@@ -44,17 +44,3 @@ jobs:
 
           echo "Menjalankan ULO Builder dan melewati pemilihan patch..."
           (echo "y"; echo "1") | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024
-
-      - name: List Kernel DTBs
-        run: |
-          cd ULO-Builder
-          echo "Mencari file .dtb di direktori ULO-Builder/core/kernel..."
-          find core/kernel -type f -name "*.dtb" > kernels.txt
-          echo "File .dtb yang ditemukan:"
-          cat kernels.txt
-
-      - name: Upload Kernel List Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-list
-          path: kernels.txt
