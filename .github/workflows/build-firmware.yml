@@ -38,10 +38,14 @@ jobs:
       - name: Prepare Patch
         if: github.event.inputs.patch_filename != ''
         run: |
-          echo "Downloading patch: ${{ github.event.inputs.patch_filename }}"
+          echo "Cleaning up patch directory..."
+          sudo rm -f ULO-Builder/patch/*
+
+          echo "Downloading selected patch: ${{ github.event.inputs.patch_filename }}"
           wget -P ULO-Builder/patch/ https://raw.githubusercontent.com/armarchindo/ULO-Builder/main/patch/${{ github.event.inputs.patch_filename }}
 
       - name: Run ULO-Builder
+        id: ulobuild
         run: |
           cd ULO-Builder
           
@@ -54,8 +58,46 @@ jobs:
 
           echo "Menjalankan ULO Builder..."
           # Jawab 'y' untuk mengunduh rootfs tambahan, lalu pilih patch.
+          # Jalankan build dan salin output ke log file dan stdout
           if [ -n "${{ github.event.inputs.patch_filename }}" ]; then
-            (echo "y"; echo "2") | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024
+            (echo "y"; echo "2") | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024 | tee build_output.log
           else
-            (echo "y"; echo "1") | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024
+            (echo "y"; echo "1") | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024 | tee build_output.log
           fi
+
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event.inputs.target_device }}-${{ github.event.inputs.kernel_version }}-${{ github.run_number }}
+          release_name: "${{ github.event.inputs.target_device }} | ${{ github.event.inputs.kernel_version }} | #${{ github.run_number }}"
+          body: |
+            Build otomatis firmware.
+            - **Perangkat**: ${{ github.event.inputs.target_device }}
+            - **Kernel**: ${{ github.event.inputs.kernel_version }}
+            - **RootFS**: ${{ github.event.inputs.rootfs_filename }}
+            - **Patch**: ${{ github.event.inputs.patch_filename || 'None' }}
+          draft: false
+          prerelease: false
+
+      - name: Prepare Artifact
+        id: artifact
+        run: |
+          mkdir -p output
+          FIRMWARE_PATH=$(find ./ULO-Builder/out -name "*.img.gz" -type f)
+          mv "$FIRMWARE_PATH" ./output/
+          FIRMWARE_FILENAME=$(ls output)
+          echo "FIRMWARE_FILENAME=$FIRMWARE_FILENAME" >> $GITHUB_OUTPUT
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./output/${{ steps.artifact.outputs.FIRMWARE_FILENAME }}
+          asset_name: ${{ steps.artifact.outputs.FIRMWARE_FILENAME }}
+          asset_content_type: application/gzip
