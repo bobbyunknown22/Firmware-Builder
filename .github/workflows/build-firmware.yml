@@ -13,10 +13,46 @@ on:
         description: 'Kernel Version (e.g., 6.1.104-AW64-DBAI)'
         required: true
         default: '6.1.104-AW64-DBAI'
-      rootfs_filename:
-        description: 'Rootfs filename (will be downloaded by ULO)'
+      rootfs_type:
+        description: 'RootFS Type (ready or custom)'
         required: true
+        default: 'ready'
+        type: choice
+        options:
+          - ready
+          - custom
+      rootfs_filename:
+        description: 'Pre-built Rootfs filename (for ready type)'
+        required: false
         default: 'openwrt-23.05.5-vanila-armsr-armv8-generic-ext4-rootfs.img.gz'
+      openwrt_version:
+        description: 'OpenWrt Version (for custom rootfs)'
+        required: false
+        default: '24.10.2'
+        type: choice
+        options:
+          - '24.10.2'
+          - '24.10.1'
+          - '24.10.0'
+          - '23.05.6'
+          - '23.05.5'
+          - '23.05.4'
+          - '23.05.3'
+          - '23.05.2'
+          - '23.05.1'
+          - '23.05.0'
+      firmware_base:
+        description: 'Firmware Base (for custom rootfs)'
+        required: false
+        default: 'openwrt'
+        type: choice
+        options:
+          - openwrt
+          - immortalwrt
+      custom_packages:
+        description: 'Custom packages list (space separated)'
+        required: false
+        default: ''
       patch_filename:
         description: 'Patch filename (optional, from ULO-Builder repo)'
         required: false
@@ -33,6 +69,85 @@ jobs:
       - name: Setup ULO-Builder
         run: |
           git clone https://github.com/bobbyunknown/ULO-Builder --branch dev --depth 1
+
+      - name: Build Custom RootFS with ImageBuilder
+        if: github.event.inputs.rootfs_type == 'custom'
+        id: build_rootfs
+        run: |
+          echo "Building custom rootfs with ImageBuilder..."
+          
+          # Set variables
+          FIRMWARE_BASE="${{ github.event.inputs.firmware_base }}"
+          OPENWRT_VERSION="${{ github.event.inputs.openwrt_version }}"
+          PACKAGES="${{ github.event.inputs.custom_packages }}"
+          
+          if [ "$FIRMWARE_BASE" = "openwrt" ]; then
+            # Download OpenWrt ImageBuilder
+            IMAGEBUILDER_URL="https://downloads.openwrt.org/releases/${OPENWRT_VERSION}/targets/armsr/armv8/openwrt-imagebuilder-${OPENWRT_VERSION}-armsr-armv8.Linux-x86_64.tar.zst"
+            echo "Downloading OpenWrt ImageBuilder from: $IMAGEBUILDER_URL"
+            
+            wget -O imagebuilder.tar.zst "$IMAGEBUILDER_URL"
+            
+            # Extract ImageBuilder
+            sudo apt-get update && sudo apt-get install -y zstd
+            tar --zstd -xf imagebuilder.tar.zst
+            cd openwrt-imagebuilder-${OPENWRT_VERSION}-armsr-armv8
+            
+            # Install dependencies
+            sudo apt-get install -y build-essential clang flex bison g++ gawk \
+              gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
+              python3-setuptools rsync swig unzip zlib1g-dev file wget
+            
+            # Build rootfs
+            echo "Building OpenWrt with packages: $PACKAGES"
+            if [ -n "$PACKAGES" ]; then
+              make image PROFILE=generic PACKAGES="$PACKAGES" ROOTFS_PARTSIZE=1024
+            else
+              make image PROFILE=generic ROOTFS_PARTSIZE=1024
+            fi
+            
+            # Find the generated rootfs
+            ROOTFS_FILE=$(find bin/targets/armsr/armv8/ -name "*rootfs*.img.gz" | head -1)
+            if [ -z "$ROOTFS_FILE" ]; then
+              echo "Error: No rootfs file found!"
+              exit 1
+            fi
+            
+            # Generate custom filename
+            CUSTOM_ROOTFS_NAME="openwrt-${OPENWRT_VERSION}-custom-armsr-armv8-generic-ext4-rootfs.img.gz"
+            
+          elif [ "$FIRMWARE_BASE" = "immortalwrt" ]; then
+            echo "ImmortalWrt build not implemented yet. Creating placeholder..."
+            
+            # For now, create a placeholder until we implement ImmortalWrt
+            # TODO: Implement ImmortalWrt ImageBuilder support
+            echo "Error: ImmortalWrt custom build is not yet implemented."
+            echo "Please use OpenWrt for custom builds or select a pre-built rootfs."
+            exit 1
+            
+            # Future implementation:
+            # IMAGEBUILDER_URL="https://downloads.immortalwrt.org/releases/${IMMORTALWRT_VERSION}/targets/armsr/armv8/..."
+            # CUSTOM_ROOTFS_NAME="immortalwrt-${IMMORTALWRT_VERSION}-custom-armsr-armv8-generic-ext4-rootfs.img.gz"
+            
+          else
+            echo "Error: Unsupported firmware base: $FIRMWARE_BASE"
+            exit 1
+          fi
+          
+          # Copy to ULO-Builder rootfs directory (only for OpenWrt for now)
+          if [ "$FIRMWARE_BASE" = "openwrt" ]; then
+            mkdir -p ../ULO-Builder/rootfs
+            cp "$ROOTFS_FILE" "../ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME"
+            
+            echo "Custom rootfs built: $CUSTOM_ROOTFS_NAME"
+            echo "CUSTOM_ROOTFS_NAME=$CUSTOM_ROOTFS_NAME" >> $GITHUB_ENV
+            echo "ROOTFS_FILENAME=$CUSTOM_ROOTFS_NAME" >> $GITHUB_ENV
+          fi
+
+      - name: Setup Ready RootFS
+        if: github.event.inputs.rootfs_type == 'ready'
+        run: |
+          echo "Using pre-built rootfs: ${{ github.event.inputs.rootfs_filename }}"
           echo "ROOTFS_FILENAME=${{ github.event.inputs.rootfs_filename }}" >> $GITHUB_ENV
 
       - name: Prepare Patch
@@ -56,9 +171,10 @@ jobs:
           echo "Verifikasi konfigurasi:"
           grep 'DOWNLOAD_CUSTOM' ulo
 
+          echo "Using rootfs: ${{ env.ROOTFS_FILENAME }}"
           echo "Menjalankan ULO Builder..."
-          # Jawab 'y' untuk mengunduh rootfs tambahan, lalu pilih patch.
-          # Jalankan build dan salin output ke log file dan stdout
+          
+          # Build firmware
           if [ -n "${{ github.event.inputs.patch_filename }}" ]; then
             (echo "y"; echo "2") | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024 | tee build_output.log
           else
@@ -75,6 +191,10 @@ jobs:
             Build otomatis firmware.
             - **Perangkat**: ${{ github.event.inputs.target_device }}
             - **Kernel**: ${{ github.event.inputs.kernel_version }}
-            - **RootFS**: ${{ github.event.inputs.rootfs_filename }}
+            - **RootFS Type**: ${{ github.event.inputs.rootfs_type }}
+            - **RootFS**: ${{ env.ROOTFS_FILENAME }}
+            - **OpenWrt Version**: ${{ github.event.inputs.openwrt_version || 'N/A' }}
+            - **Firmware Base**: ${{ github.event.inputs.firmware_base || 'N/A' }}
+            - **Custom Packages**: ${{ github.event.inputs.custom_packages || 'None' }}
             - **Patch**: ${{ github.event.inputs.patch_filename || 'None' }}
           files: ./ULO-Builder/out/**/*.img.gz
