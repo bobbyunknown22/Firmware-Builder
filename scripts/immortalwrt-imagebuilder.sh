@@ -30,18 +30,31 @@ wait_for_apt_lock() {
 # Install required tools
 echo "Installing extraction tools..."
 wait_for_apt_lock
-sudo apt-get update && sudo apt-get install -y xz-utils
+sudo apt-get update && sudo apt-get install -y zstd xz-utils
 
-# Download ImmortalWrt ImageBuilder
+# Download ImmortalWrt ImageBuilder with fallback
 echo "Downloading ImmortalWrt ImageBuilder..."
-IMAGEBUILDER_URL="https://downloads.immortalwrt.org/releases/${VERSION}/targets/armsr/armv8/immortalwrt-imagebuilder-${VERSION}-armsr-armv8.Linux-x86_64.tar.xz"
-echo "Downloading from: $IMAGEBUILDER_URL"
+IMAGEBUILDER_URL="https://downloads.immortalwrt.org/releases/${VERSION}/targets/armsr/armv8/immortalwrt-imagebuilder-${VERSION}-armsr-armv8.Linux-x86_64.tar.zst"
+echo "Trying: $IMAGEBUILDER_URL"
 
-wget -O immortalwrt-imagebuilder.tar.xz "$IMAGEBUILDER_URL"
+if ! wget --spider "$IMAGEBUILDER_URL" 2>/dev/null; then
+    echo "Warning: .tar.zst not found, trying .tar.xz format..."
+    IMAGEBUILDER_URL="https://downloads.immortalwrt.org/releases/${VERSION}/targets/armsr/armv8/immortalwrt-imagebuilder-${VERSION}-armsr-armv8.Linux-x86_64.tar.xz"
+    echo "Trying: $IMAGEBUILDER_URL"
+    wget -O immortalwrt-imagebuilder.tar.xz "$IMAGEBUILDER_URL"
+    FILE_EXT="xz"
+else
+    wget -O immortalwrt-imagebuilder.tar.zst "$IMAGEBUILDER_URL"
+    FILE_EXT="zst"
+fi
 
 # Extract ImageBuilder
 echo "Extracting ImmortalWrt ImageBuilder..."
-tar -xf immortalwrt-imagebuilder.tar.xz
+if [ "$FILE_EXT" = "zst" ]; then
+    tar --zstd -xf immortalwrt-imagebuilder.tar.zst
+else
+    tar -xf immortalwrt-imagebuilder.tar.xz
+fi
 
 # Find extracted directory
 IMAGEBUILDER_DIR=$(find . -maxdepth 1 -name "immortalwrt-imagebuilder-*" -type d | head -1)
