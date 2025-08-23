@@ -91,18 +91,32 @@ jobs:
               echo "Warning: .tar.zst not found, trying .tar.xz format..."
               IMAGEBUILDER_URL="https://downloads.openwrt.org/releases/${OPENWRT_VERSION}/targets/armsr/armv8/openwrt-imagebuilder-${OPENWRT_VERSION}-armsr-armv8.Linux-x86_64.tar.xz"
               echo "Trying alternative URL: $IMAGEBUILDER_URL"
-            fi
-            
-            wget -O imagebuilder.tar.* "$IMAGEBUILDER_URL"
-            
-            # Extract ImageBuilder (detect format)
-            sudo apt-get update && sudo apt-get install -y zstd xz-utils
-            if [[ "$IMAGEBUILDER_URL" == *.tar.zst ]]; then
-              tar --zstd -xf imagebuilder.tar.*
+              wget -O imagebuilder.tar.xz "$IMAGEBUILDER_URL"
+              FILE_EXT="xz"
             else
-              tar -xf imagebuilder.tar.*
+              wget -O imagebuilder.tar.zst "$IMAGEBUILDER_URL"
+              FILE_EXT="zst"
             fi
-            cd openwrt-imagebuilder-${OPENWRT_VERSION}-armsr-armv8
+            
+            # Extract ImageBuilder based on detected format
+            sudo apt-get update && sudo apt-get install -y zstd xz-utils
+            echo "Extracting imagebuilder file..."
+            if [ "$FILE_EXT" = "zst" ]; then
+              tar --zstd -xf imagebuilder.tar.zst
+            else
+              tar -xf imagebuilder.tar.xz
+            fi
+            
+            # Verify extraction and find directory
+            IMAGEBUILDER_DIR=$(find . -maxdepth 1 -name "openwrt-imagebuilder-*" -type d | head -1)
+            if [ -z "$IMAGEBUILDER_DIR" ]; then
+              echo "Error: ImageBuilder directory not found after extraction!"
+              ls -la
+              exit 1
+            fi
+            
+            echo "Found ImageBuilder directory: $IMAGEBUILDER_DIR"
+            cd "$IMAGEBUILDER_DIR"
             
             # Install dependencies
             sudo apt-get install -y build-essential clang flex bison g++ gawk \
@@ -136,8 +150,19 @@ jobs:
             
             # Extract ImageBuilder (ImmortalWrt uses .tar.xz)
             sudo apt-get update && sudo apt-get install -y xz-utils
+            echo "Extracting ImmortalWrt imagebuilder file..."
             tar -xf imagebuilder.tar.xz
-            cd immortalwrt-imagebuilder-${OPENWRT_VERSION}-armsr-armv8
+            
+            # Verify extraction and find directory
+            IMAGEBUILDER_DIR=$(find . -maxdepth 1 -name "immortalwrt-imagebuilder-*" -type d | head -1)
+            if [ -z "$IMAGEBUILDER_DIR" ]; then
+              echo "Error: ImmortalWrt ImageBuilder directory not found after extraction!"
+              ls -la
+              exit 1
+            fi
+            
+            echo "Found ImmortalWrt ImageBuilder directory: $IMAGEBUILDER_DIR"
+            cd "$IMAGEBUILDER_DIR"
             
             # Install dependencies (same as OpenWrt)
             sudo apt-get install -y build-essential clang flex bison g++ gawk \
