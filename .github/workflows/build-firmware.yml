@@ -5,13 +5,21 @@ name: Build OpenWRT Firmware
 on:
   workflow_dispatch:
     inputs:
+      builder_type:
+        description: 'Builder Type'
+        required: true
+        type: choice
+        options:
+          - ulo
+          - ophub
+        default: 'ulo'
       target_device:
-        description: 'Target Device (e.g., s905x2, rk3328)'
+        description: 'Target Device (e.g., s905x2, rk3328, h618-orangepi-zero3)'
         required: true
         default: 'h618-orangepi-zero3'
       kernel_version:
-        description: 'Kernel Version (e.g., 6.1.104-AW64-DBAI)'
-        required: true
+        description: 'Kernel Version (e.g., 6.1.104-AW64-DBAI) - Required for ULO only'
+        required: false
         default: '6.1.104-AW64-DBAI'
       rootfs_type:
         description: 'RootFS Type (ready or custom)'
@@ -25,6 +33,10 @@ on:
         description: 'Pre-built Rootfs filename (for ready type)'
         required: false
         default: 'openwrt-23.05.5-vanila-armsr-armv8-generic-ext4-rootfs.img.gz'
+      firmware_size:
+        description: 'Firmware Size (MB)'
+        required: false
+        default: '1024'
       openwrt_version:
         description: 'OpenWrt Version (for custom rootfs)'
         required: false
@@ -54,7 +66,7 @@ on:
         required: false
         default: ''
       patch_filename:
-        description: 'Patch filename (optional, from ULO-Builder repo)'
+        description: 'Patch filename (optional, ULO-Builder only)'
         required: false
         default: ''
 
@@ -66,9 +78,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup ULO-Builder
+      - name: Install dependencies
         run: |
-          git clone https://github.com/bobbyunknown/ULO-Builder --branch dev --depth 1
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget
 
       - name: Build Custom RootFS with ImageBuilder
         if: github.event.inputs.rootfs_type == 'custom'
@@ -106,51 +119,80 @@ jobs:
           echo "Using pre-built rootfs: ${{ github.event.inputs.rootfs_filename }}"
           echo "ROOTFS_FILENAME=${{ github.event.inputs.rootfs_filename }}" >> $GITHUB_ENV
 
-      - name: Prepare Patch
-        if: github.event.inputs.patch_filename != ''
+      - name: Build with ULO-Builder
+        if: github.event.inputs.builder_type == 'ulo'
         run: |
-          echo "Cleaning up patch directory..."
-          sudo rm -f ULO-Builder/patch/*
-
-          echo "Downloading selected patch: ${{ github.event.inputs.patch_filename }}"
-          wget -P ULO-Builder/patch/ https://raw.githubusercontent.com/armarchindo/ULO-Builder/main/patch/${{ github.event.inputs.patch_filename }}
-
-      - name: Run ULO-Builder
-        id: ulobuild
-        run: |
-          cd ULO-Builder
+          echo "Building firmware with ULO-Builder..."
           
-          echo "Mengaktifkan unduhan kustom..."
-          sudo sed -i 's/DOWNLOAD_CUSTOM_KERNEL=false/DOWNLOAD_CUSTOM_KERNEL=true/' ulo
-          sudo sed -i 's/DOWNLOAD_CUSTOM_ROOTFS=false/DOWNLOAD_CUSTOM_ROOTFS=true/' ulo
-
-          echo "Verifikasi konfigurasi:"
-          grep 'DOWNLOAD_CUSTOM' ulo
-
-          echo "Using rootfs: ${{ env.ROOTFS_FILENAME }}"
-          echo "Menjalankan ULO Builder..."
+          # Make ULO script executable
+          chmod +x scripts/ulo-builder.sh
           
-          # Build firmware
+          # Prepare patch file if specified
+          PATCH_FILE="none"
           if [ -n "${{ github.event.inputs.patch_filename }}" ]; then
-            (echo "y"; echo "2") | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024 | tee build_output.log
-          else
-            (echo "y"; echo "1") | sudo ./ulo -m "${{ github.event.inputs.target_device }}" -r "${{ env.ROOTFS_FILENAME }}" -k "${{ github.event.inputs.kernel_version }}" -s 1024 | tee build_output.log
+            echo "Downloading patch: ${{ github.event.inputs.patch_filename }}"
+            wget -O patch.zip "https://raw.githubusercontent.com/armarchindo/ULO-Builder/main/patch/${{ github.event.inputs.patch_filename }}"
+            PATCH_FILE="patch.zip"
           fi
+          
+          # Run ULO build
+          ./scripts/ulo-builder.sh \
+            "${{ github.event.inputs.target_device }}" \
+            "${{ github.event.inputs.kernel_version }}" \
+            "${{ env.ROOTFS_FILENAME }}" \
+            "$PATCH_FILE" \
+            "${{ github.event.inputs.firmware_size }}"
+          
+          echo "ULO-Builder completed successfully!"
+
+      - name: Build with Ophub Builder
+        if: github.event.inputs.builder_type == 'ophub'
+        run: |
+          echo "Building firmware with Ophub Builder..."
+          
+          # Make Ophub script executable
+          chmod +x scripts/ophub-builder.sh
+          
+          # Run Ophub build
+          ./scripts/ophub-builder.sh \
+            "${{ github.event.inputs.target_device }}" \
+            "${{ env.ROOTFS_FILENAME }}" \
+            "${{ github.event.inputs.firmware_size }}"
+          
+          echo "Ophub Builder completed successfully!"
 
 
       - name: Create and Upload Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.target_device }}-${{ github.event.inputs.kernel_version }}-${{ github.run_number }}
-          name: "${{ github.event.inputs.target_device }} | ${{ github.event.inputs.kernel_version }} | #${{ github.run_number }}"
+          tag_name: ${{ github.event.inputs.builder_type }}-${{ github.event.inputs.target_device }}-${{ github.run_number }}
+          name: "[${{ github.event.inputs.builder_type }}] ${{ github.event.inputs.target_device }} | #${{ github.run_number }}"
           body: |
-            Build otomatis firmware.
-            - **Perangkat**: ${{ github.event.inputs.target_device }}
-            - **Kernel**: ${{ github.event.inputs.kernel_version }}
+            🚀 **Firmware Build Otomatis**
+            
+            **Builder Information:**
+            - **Builder Type**: ${{ github.event.inputs.builder_type == 'ulo' && 'ULO-Builder' || 'Ophub Builder' }}
+            - **Target Device**: ${{ github.event.inputs.target_device }}
+            ${{ github.event.inputs.builder_type == 'ulo' && format('- **Kernel Version**: {0}', github.event.inputs.kernel_version) || '' }}
+            - **Firmware Size**: ${{ github.event.inputs.firmware_size }}MB
+            
+            **RootFS Configuration:**
             - **RootFS Type**: ${{ github.event.inputs.rootfs_type }}
-            - **RootFS**: ${{ env.ROOTFS_FILENAME }}
-            - **OpenWrt Version**: ${{ github.event.inputs.openwrt_version || 'N/A' }}
-            - **Firmware Base**: ${{ github.event.inputs.firmware_base || 'N/A' }}
-            - **Custom Packages**: ${{ github.event.inputs.custom_packages || 'None' }}
-            - **Patch**: ${{ github.event.inputs.patch_filename || 'None' }}
-          files: ./ULO-Builder/out/**/*.img.gz
+            - **RootFS File**: ${{ env.ROOTFS_FILENAME }}
+            ${{ github.event.inputs.rootfs_type == 'custom' && format('- **Firmware Base**: {0}', github.event.inputs.firmware_base) || '' }}
+            ${{ github.event.inputs.rootfs_type == 'custom' && format('- **OpenWrt Version**: {0}', github.event.inputs.openwrt_version) || '' }}
+            ${{ github.event.inputs.custom_packages != '' && format('- **Custom Packages**: {0}', github.event.inputs.custom_packages) || '- **Custom Packages**: None' }}
+            ${{ github.event.inputs.builder_type == 'ulo' && github.event.inputs.patch_filename != '' && format('- **Patch**: {0}', github.event.inputs.patch_filename) || '' }}
+            ${{ github.event.inputs.builder_type == 'ulo' && github.event.inputs.patch_filename == '' && '- **Patch**: None' || '' }}
+            
+            **Build Details:**
+            - **Build Date**: $(date +'%Y-%m-%d %H:%M:%S UTC')
+            - **Workflow Run**: #${{ github.run_number }}
+            - **Repository**: ${{ github.repository }}
+            
+            ---
+            
+            ${{ github.event.inputs.builder_type == 'ulo' && '📦 **ULO-Builder**: Universal firmware builder supporting all ARM devices' || '🔧 **Ophub Builder**: Specialized builder for Rockchip, Allwinner, and Amlogic devices' }}
+          files: |
+            ${{ github.event.inputs.builder_type == 'ulo' && './ulo-output/**/*.img.gz' || './ophub-output/**/*.img.gz' }}
+            ${{ github.event.inputs.builder_type == 'ulo' && './ULO-Builder/out/**/*.img.gz' || './ophub-builder/openwrt/out/**/*.img.gz' }}
