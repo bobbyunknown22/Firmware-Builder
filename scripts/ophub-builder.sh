@@ -253,8 +253,11 @@ main() {
             # Create output directory
             mkdir -p ../ophub-output
             
-            # Copy all output files
-            cp -r openwrt/out/* ../ophub-output/ 2>/dev/null
+            # Copy only .img.gz files to avoid duplicates
+            find openwrt/out -name "*.img.gz" -exec cp {} ../ophub-output/ \;
+            
+            # Also copy .img files if they exist
+            find openwrt/out -name "*.img" -exec cp {} ../ophub-output/ \; 2>/dev/null || true
             
             # List output files
             log_info "Output files:"

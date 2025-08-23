@@ -226,4 +226,3 @@ jobs:
             ${{ github.event.inputs.builder_type == 'ulo' && '📦 **ULO-Builder**: Universal firmware builder supporting all ARM devices' || '🔧 **Ophub Builder**: Specialized builder for Rockchip, Allwinner, and Amlogic devices' }}
           files: |
             ${{ github.event.inputs.builder_type == 'ulo' && './ulo-output/**/*.img.gz' || './ophub-output/**/*.img.gz' }}
-            ${{ github.event.inputs.builder_type == 'ulo' && './ULO-Builder/out/**/*.img.gz' || './ophub-builder/openwrt/out/**/*.img.gz' }}

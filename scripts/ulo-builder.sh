@@ -166,8 +166,11 @@ run_ulo_build() {
             # Create output directory
             mkdir -p ../ulo-output
             
-            # Copy all output files
-            cp -r out/* ../ulo-output/ 2>/dev/null
+            # Copy only .img.gz files to avoid duplicates
+            find out -name "*.img.gz" -exec cp {} ../ulo-output/ \;
+            
+            # Also copy .img files if they exist
+            find out -name "*.img" -exec cp {} ../ulo-output/ \; 2>/dev/null || true
             
             # List output files
             log_info "Output files:"
