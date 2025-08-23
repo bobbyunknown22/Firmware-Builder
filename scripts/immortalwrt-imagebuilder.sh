@@ -54,6 +54,20 @@ fi
 echo "Found ImmortalWrt ImageBuilder directory: $IMAGEBUILDER_DIR"
 cd "$IMAGEBUILDER_DIR"
 
+# Configure .config to generate only tar.gz rootfs
+echo "Configuring ImageBuilder for tar.gz output only..."
+sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config 2>/dev/null || true
+sed -i 's/CONFIG_TARGET_ROOTFS_SQUASHFS=y/# CONFIG_TARGET_ROOTFS_SQUASHFS is not set/' .config 2>/dev/null || true
+sed -i 's/CONFIG_GRUB_EFI_IMAGES=y/# CONFIG_GRUB_EFI_IMAGES is not set/' .config 2>/dev/null || true
+sed -i 's/CONFIG_TARGET_IMAGES_GZIP=y/# CONFIG_TARGET_IMAGES_GZIP is not set/' .config 2>/dev/null || true
+
+# Ensure tar.gz is enabled
+if ! grep -q "CONFIG_TARGET_ROOTFS_TARGZ=y" .config; then
+    echo "CONFIG_TARGET_ROOTFS_TARGZ=y" >> .config
+fi
+
+echo "ImageBuilder configured to generate only rootfs.tar.gz"
+
 # Install build dependencies
 echo "Installing build dependencies..."
 wait_for_apt_lock
