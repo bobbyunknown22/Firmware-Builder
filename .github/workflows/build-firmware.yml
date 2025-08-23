@@ -118,6 +118,17 @@ jobs:
         run: |
           echo "Using pre-built rootfs: ${{ github.event.inputs.rootfs_filename }}"
           echo "ROOTFS_FILENAME=${{ github.event.inputs.rootfs_filename }}" >> $GITHUB_ENV
+          
+          echo "RootFS configuration:"
+          echo "- Type: Ready (pre-built)"
+          echo "- Filename: ${{ github.event.inputs.rootfs_filename }}"
+          echo "- Builder: ${{ github.event.inputs.builder_type }}"
+          
+          if [ "${{ github.event.inputs.builder_type }}" = "ulo" ]; then
+            echo "- ULO-Builder will download the rootfs automatically during build"
+          else
+            echo "- Ophub Builder will download the rootfs from available sources"
+          fi
 
       - name: Build with ULO-Builder
         if: github.event.inputs.builder_type == 'ulo'
@@ -135,11 +146,21 @@ jobs:
             PATCH_FILE="patch.zip"
           fi
           
+          # Determine rootfs filename based on type
+          if [ "${{ github.event.inputs.rootfs_type }}" = "ready" ]; then
+            ROOTFS_FILE="${{ github.event.inputs.rootfs_filename }}"
+          else
+            # For custom rootfs, the filename will be set by the ImageBuilder step
+            ROOTFS_FILE="${{ env.ROOTFS_FILENAME }}"
+          fi
+          
+          echo "Using rootfs file: $ROOTFS_FILE"
+          
           # Run ULO build
           ./scripts/ulo-builder.sh \
             "${{ github.event.inputs.target_device }}" \
             "${{ github.event.inputs.kernel_version }}" \
-            "${{ env.ROOTFS_FILENAME }}" \
+            "$ROOTFS_FILE" \
             "$PATCH_FILE" \
             "${{ github.event.inputs.firmware_size }}"
           
@@ -153,10 +174,20 @@ jobs:
           # Make Ophub script executable
           chmod +x scripts/ophub-builder.sh
           
+          # Determine rootfs filename based on type
+          if [ "${{ github.event.inputs.rootfs_type }}" = "ready" ]; then
+            ROOTFS_FILE="${{ github.event.inputs.rootfs_filename }}"
+          else
+            # For custom rootfs, the filename will be set by the ImageBuilder step
+            ROOTFS_FILE="${{ env.ROOTFS_FILENAME }}"
+          fi
+          
+          echo "Using rootfs file: $ROOTFS_FILE"
+          
           # Run Ophub build
           ./scripts/ophub-builder.sh \
             "${{ github.event.inputs.target_device }}" \
-            "${{ env.ROOTFS_FILENAME }}" \
+            "$ROOTFS_FILE" \
             "${{ github.event.inputs.firmware_size }}"
           
           echo "Ophub Builder completed successfully!"

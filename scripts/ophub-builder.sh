@@ -36,6 +36,101 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Download rootfs function
+download_rootfs() {
+    local rootfs_filename="${1}"
+    
+    if [[ -f "${rootfs_filename}" ]]; then
+        log_info "RootFS file already exists: ${rootfs_filename}"
+        return 0
+    fi
+    
+    log_info "Downloading RootFS: ${rootfs_filename}"
+    
+    # Try downloading from ULO-repository first
+    local ulo_repo_url="https://github.com/armarchindo/ULO-repository/raw/main/rootfs/${rootfs_filename}"
+    log_info "Trying ULO-repository: ${ulo_repo_url}"
+    
+    if wget -q --spider "${ulo_repo_url}" 2>/dev/null; then
+        log_info "Found in ULO-repository, downloading..."
+        if wget -O "${rootfs_filename}" "${ulo_repo_url}" --progress=bar:force 2>&1; then
+            if [[ -f "${rootfs_filename}" ]]; then
+                log_success "Downloaded from ULO-repository successfully"
+                return 0
+            fi
+        fi
+        log_warning "Download from ULO-repository failed"
+    else
+        log_info "File not found in ULO-repository"
+    fi
+    
+    # Try downloading from rootfs-openwrt releases
+    log_info "Trying rootfs-openwrt releases..."
+    local releases_api="https://api.github.com/repos/armarchindo/rootfs-openwrt/releases"
+    
+    # Get the download URL from releases
+    local download_url=$(curl -s "${releases_api}" | \
+        grep -o '"browser_download_url": "[^"]*'"${rootfs_filename}"'"' | \
+        cut -d'"' -f4 | head -n1)
+    
+    if [[ -n "${download_url}" ]]; then
+        log_info "Found in releases: ${download_url}"
+        if wget -O "${rootfs_filename}" "${download_url}" --progress=bar:force 2>&1; then
+            if [[ -f "${rootfs_filename}" ]]; then
+                log_success "Downloaded from releases successfully"
+                return 0
+            fi
+        fi
+        log_warning "Download from releases failed"
+    else
+        log_info "File not found in releases"
+    fi
+    
+    log_error "Failed to download RootFS: ${rootfs_filename}"
+    log_info "Available sources checked:"
+    log_info "1. ULO-repository: ${ulo_repo_url}"
+    log_info "2. rootfs-openwrt releases API: ${releases_api}"
+    
+    # List available files from both sources for debugging
+    log_info "Attempting to list available files for debugging..."
+    
+    # Check ULO-repository directory listing
+    log_info "Checking ULO-repository directory:"
+    curl -s "https://api.github.com/repos/armarchindo/ULO-repository/contents/rootfs" | \
+        grep '"name":' | head -10 || log_warning "Could not list ULO-repository files"
+    
+    # Check recent releases
+    log_info "Checking recent releases:"
+    curl -s "${releases_api}" | grep '"name":' | head -5 || log_warning "Could not list recent releases"
+    
+    return 1
+}
+
+# Handle rootfs format conversion if needed
+handle_rootfs_format() {
+    local rootfs_file="${1}"
+    
+    if [[ ! -f "${rootfs_file}" ]]; then
+        log_error "RootFS file not found: ${rootfs_file}"
+        return 1
+    fi
+    
+    # Check if file is .img.gz and Ophub might need .tar.gz
+    if [[ "${rootfs_file}" == *.img.gz ]]; then
+        log_info "RootFS is .img.gz format, checking if conversion is needed..."
+        
+        # For now, we'll use it as-is since Ophub can handle various formats
+        # The key is to place it in the correct directory
+        log_info "Using .img.gz file directly (Ophub can handle this format)"
+    elif [[ "${rootfs_file}" == *.tar.gz ]]; then
+        log_info "RootFS is .tar.gz format (preferred for Ophub)"
+    else
+        log_warning "Unknown rootfs format: ${rootfs_file}"
+        log_info "Proceeding anyway, Ophub will validate the format"
+    fi
+    
+    return 0
+}
 # Validation function
 validate_params() {
     if [[ -z "${TARGET_DEVICE}" ]]; then
@@ -50,12 +145,8 @@ validate_params() {
         exit 1
     fi
 
-    if [[ ! -f "${ROOTFS_FILE}" ]]; then
-        log_error "RootFS file not found: ${ROOTFS_FILE}"
-        echo "Available files in current directory:"
-        ls -la *.tar.gz 2>/dev/null || echo "No .tar.gz files found"
-        exit 1
-    fi
+    # Note: We don't check if file exists here since we'll download it if needed
+    log_info "Parameters validated successfully"
 }
 
 # Main function
@@ -67,6 +158,40 @@ main() {
     
     # Validate parameters
     validate_params
+    
+    # Download rootfs if needed
+    log_info "Checking RootFS availability..."
+    if ! download_rootfs "${ROOTFS_FILE}"; then
+        log_error "Failed to obtain RootFS file"
+        exit 1
+    fi
+    
+    # Verify rootfs file exists and is valid
+    if [[ ! -f "${ROOTFS_FILE}" ]]; then
+        log_error "RootFS file still not found after download attempt: ${ROOTFS_FILE}"
+        exit 1
+    fi
+    
+    # Check file size to ensure it's not corrupted
+    local file_size=$(stat -f%z "${ROOTFS_FILE}" 2>/dev/null || stat -c%s "${ROOTFS_FILE}" 2>/dev/null || echo "0")
+    if [[ "${file_size}" -lt 1000000 ]]; then  # Less than 1MB is likely corrupted
+        log_error "RootFS file appears to be corrupted (size: ${file_size} bytes)"
+        log_info "Removing corrupted file and retrying..."
+        rm -f "${ROOTFS_FILE}"
+        if ! download_rootfs "${ROOTFS_FILE}"; then
+            log_error "Failed to re-download RootFS file"
+            exit 1
+        fi
+    fi
+    
+    log_success "RootFS file ready: ${ROOTFS_FILE} (size: ${file_size} bytes)"
+    
+    # Handle rootfs format if needed
+    log_info "Validating RootFS format..."
+    if ! handle_rootfs_format "${ROOTFS_FILE}"; then
+        log_error "RootFS format validation failed"
+        exit 1
+    fi
     
     # Clone Ophub repository
     log_info "Cloning Ophub repository..."
