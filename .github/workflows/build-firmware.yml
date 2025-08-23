@@ -86,11 +86,22 @@ jobs:
             IMAGEBUILDER_URL="https://downloads.openwrt.org/releases/${OPENWRT_VERSION}/targets/armsr/armv8/openwrt-imagebuilder-${OPENWRT_VERSION}-armsr-armv8.Linux-x86_64.tar.zst"
             echo "Downloading OpenWrt ImageBuilder from: $IMAGEBUILDER_URL"
             
-            wget -O imagebuilder.tar.zst "$IMAGEBUILDER_URL"
+            # Check if file exists first
+            if ! wget --spider "$IMAGEBUILDER_URL" 2>/dev/null; then
+              echo "Warning: .tar.zst not found, trying .tar.xz format..."
+              IMAGEBUILDER_URL="https://downloads.openwrt.org/releases/${OPENWRT_VERSION}/targets/armsr/armv8/openwrt-imagebuilder-${OPENWRT_VERSION}-armsr-armv8.Linux-x86_64.tar.xz"
+              echo "Trying alternative URL: $IMAGEBUILDER_URL"
+            fi
             
-            # Extract ImageBuilder
-            sudo apt-get update && sudo apt-get install -y zstd
-            tar --zstd -xf imagebuilder.tar.zst
+            wget -O imagebuilder.tar.* "$IMAGEBUILDER_URL"
+            
+            # Extract ImageBuilder (detect format)
+            sudo apt-get update && sudo apt-get install -y zstd xz-utils
+            if [[ "$IMAGEBUILDER_URL" == *.tar.zst ]]; then
+              tar --zstd -xf imagebuilder.tar.*
+            else
+              tar -xf imagebuilder.tar.*
+            fi
             cd openwrt-imagebuilder-${OPENWRT_VERSION}-armsr-armv8
             
             # Install dependencies
