@@ -84,15 +84,17 @@ else
     make image PROFILE=generic ROOTFS_PARTSIZE=1024
 fi
 
-# Find generated rootfs
-ROOTFS_FILE=$(find bin/targets/armsr/armv8/ -name "*rootfs*.img.gz" | head -1)
+# Find generated rootfs (tar.gz format for ULO-Builder)
+ROOTFS_FILE=$(find bin/targets/armsr/armv8/ -name "*rootfs*.tar.gz" | head -1)
 if [ -z "$ROOTFS_FILE" ]; then
-    echo "Error: No rootfs file found!"
+    echo "Error: No rootfs.tar.gz file found!"
+    echo "Available files:"
+    find bin/targets/armsr/armv8/ -name "*rootfs*" -o -name "*.tar.gz"
     exit 1
 fi
 
 # Generate output filename
-CUSTOM_ROOTFS_NAME="openwrt-${VERSION}-custom-armsr-armv8-generic-ext4-rootfs.img.gz"
+CUSTOM_ROOTFS_NAME="openwrt-${VERSION}-custom-armsr-armv8-generic-rootfs.tar.gz"
 
 # Copy to ULO-Builder
 echo "Copying rootfs to ULO-Builder..."
