@@ -59,10 +59,37 @@ validate_params() {
     fi
 
     if [[ ! -f "${ROOTFS_FILE}" ]]; then
-        log_error "RootFS file not found: ${ROOTFS_FILE}"
-        echo "Available files in current directory:"
-        ls -la *.tar.gz *.img.gz 2>/dev/null || echo "No rootfs files found"
-        exit 1
+        # Check if file exists in common locations for custom builds
+        local possible_locations=(
+            "${ROOTFS_FILE}"
+            "./rootfs/${ROOTFS_FILE}"
+            "./ULO-Builder/rootfs/${ROOTFS_FILE}"
+            "../${ROOTFS_FILE}"
+        )
+        
+        local found_file=""
+        for location in "${possible_locations[@]}"; do
+            if [[ -f "${location}" ]]; then
+                log_info "Found RootFS file at: ${location}"
+                cp "${location}" "${ROOTFS_FILE}"
+                if [[ $? -eq 0 ]]; then
+                    log_success "RootFS file copied from ${location}"
+                    found_file="${ROOTFS_FILE}"
+                    break
+                fi
+            fi
+        done
+        
+        if [[ -z "${found_file}" ]]; then
+            log_error "RootFS file not found: ${ROOTFS_FILE}"
+            log_info "Checked locations:"
+            for location in "${possible_locations[@]}"; do
+                log_info "  - ${location}"
+            done
+            echo "Available files in current directory:"
+            ls -la *.tar.gz *.img.gz 2>/dev/null || echo "No rootfs files found"
+            exit 1
+        fi
     fi
 }
 

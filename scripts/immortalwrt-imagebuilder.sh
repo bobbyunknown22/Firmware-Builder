@@ -97,14 +97,33 @@ fi
 # Generate output filename
 CUSTOM_ROOTFS_NAME="immortalwrt-${VERSION}-custom-armsr-armv8-generic-rootfs.tar.gz"
 
-# Copy to ULO-Builder
-echo "Copying rootfs to ULO-Builder..."
-mkdir -p ../ULO-Builder/rootfs
-cp "$ROOTFS_FILE" "../ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME"
+# Copy to the appropriate builder directory based on builder type
+echo "Copying rootfs to appropriate builder directory..."
+
+# Check which builder is being used (from GitHub Actions environment)
+BUILDER_TYPE="${GITHUB_EVENT_INPUTS_BUILDER_TYPE:-ulo}"  # Default to ULO if not set
+echo "Builder type: $BUILDER_TYPE"
+
+if [ "$BUILDER_TYPE" = "ophub" ]; then
+    echo "Copying rootfs for Ophub Builder..."
+    # For Ophub, copy to root directory where Ophub script can find it
+    cp "$ROOTFS_FILE" "../$CUSTOM_ROOTFS_NAME"
+    echo "Copied to: ../$CUSTOM_ROOTFS_NAME"
+else
+    echo "Copying rootfs for ULO-Builder..."
+    # For ULO, copy to ULO-Builder/rootfs as before
+    mkdir -p ../ULO-Builder/rootfs
+    cp "$ROOTFS_FILE" "../ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME"
+    echo "Copied to: ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME"
+fi
 
 echo "=== ImmortalWrt ImageBuilder Complete ==="
 echo "Generated: $CUSTOM_ROOTFS_NAME"
-echo "Location: ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME"
+if [ "$BUILDER_TYPE" = "ophub" ]; then
+    echo "Location: ../$CUSTOM_ROOTFS_NAME (for Ophub Builder)"
+else
+    echo "Location: ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME (for ULO-Builder)"
+fi
 
 # Export environment variable for GitHub Actions
 echo "CUSTOM_ROOTFS_NAME=$CUSTOM_ROOTFS_NAME" >> $GITHUB_ENV

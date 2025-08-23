@@ -40,9 +40,38 @@ log_error() {
 download_rootfs() {
     local rootfs_filename="${1}"
     
+    # Check if file already exists locally (from custom build)
     if [[ -f "${rootfs_filename}" ]]; then
-        log_info "RootFS file already exists: ${rootfs_filename}"
+        log_info "RootFS file already exists locally: ${rootfs_filename}"
         return 0
+    fi
+    
+    # Check if file exists in current directory or common locations
+    local possible_locations=(
+        "${rootfs_filename}"
+        "./rootfs/${rootfs_filename}"
+        "./ULO-Builder/rootfs/${rootfs_filename}"
+        "../${rootfs_filename}"
+    )
+    
+    for location in "${possible_locations[@]}"; do
+        if [[ -f "${location}" ]]; then
+            log_info "Found RootFS file at: ${location}"
+            cp "${location}" "${rootfs_filename}"
+            if [[ $? -eq 0 ]]; then
+                log_success "RootFS file copied from ${location}"
+                return 0
+            fi
+        fi
+    done
+    
+    # If custom rootfs filename contains 'custom', it was built by ImageBuilder
+    # and should be available locally - don't try to download
+    if [[ "${rootfs_filename}" == *"custom"* ]]; then
+        log_error "Custom RootFS file not found locally: ${rootfs_filename}"
+        log_info "This appears to be a custom-built rootfs that should have been created by ImageBuilder."
+        log_info "Please check if the ImageBuilder step completed successfully."
+        return 1
     fi
     
     log_info "Downloading RootFS: ${rootfs_filename}"

@@ -86,8 +86,11 @@ jobs:
       - name: Build Custom RootFS with ImageBuilder
         if: github.event.inputs.rootfs_type == 'custom'
         id: build_rootfs
+        env:
+          GITHUB_EVENT_INPUTS_BUILDER_TYPE: ${{ github.event.inputs.builder_type }}
         run: |
           echo "Building custom rootfs with ImageBuilder..."
+          echo "Builder type: ${{ github.event.inputs.builder_type }}"
           
           # Set variables
           FIRMWARE_BASE="${{ github.event.inputs.firmware_base }}"
@@ -215,11 +218,6 @@ jobs:
             ${{ github.event.inputs.custom_packages != '' && format('- **Custom Packages**: {0}', github.event.inputs.custom_packages) || '- **Custom Packages**: None' }}
             ${{ github.event.inputs.builder_type == 'ulo' && github.event.inputs.patch_filename != '' && format('- **Patch**: {0}', github.event.inputs.patch_filename) || '' }}
             ${{ github.event.inputs.builder_type == 'ulo' && github.event.inputs.patch_filename == '' && '- **Patch**: None' || '' }}
-            
-            **Build Details:**
-            - **Build Date**: $(date +'%Y-%m-%d %H:%M:%S UTC')
-            - **Workflow Run**: #${{ github.run_number }}
-            - **Repository**: ${{ github.repository }}
             
             ---
             
