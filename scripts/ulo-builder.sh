@@ -58,6 +58,8 @@ validate_params() {
         exit 1
     fi
 
+    # For ready/pre-built rootfs, ULO-Builder will download automatically
+    # Skip file validation for now, let ULO-Builder handle the download
     if [[ ! -f "${ROOTFS_FILE}" ]]; then
         # Check if file exists in common locations for custom builds
         local possible_locations=(
@@ -81,14 +83,17 @@ validate_params() {
         done
         
         if [[ -z "${found_file}" ]]; then
-            log_error "RootFS file not found: ${ROOTFS_FILE}"
+            log_warning "RootFS file not found locally: ${ROOTFS_FILE}"
+            log_info "ULO-Builder will attempt to download the rootfs automatically"
             log_info "Checked locations:"
             for location in "${possible_locations[@]}"; do
                 log_info "  - ${location}"
             done
             echo "Available files in current directory:"
-            ls -la *.tar.gz *.img.gz 2>/dev/null || echo "No rootfs files found"
-            exit 1
+            ls -la *.tar.gz *.img.gz 2>/dev/null || echo "No rootfs files found locally"
+            
+            # Don't exit, let ULO-Builder handle the download
+            log_info "Continuing with ULO-Builder setup..."
         fi
     fi
 }
@@ -165,6 +170,14 @@ run_ulo_build() {
     log_info "RootFS File: ${ROOTFS_FILE}"
     log_info "Patch File: ${PATCH_FILE:-None}"
     log_info "Firmware Size: ${FIRMWARE_SIZE}MB"
+    
+    # Check if rootfs file exists before starting build
+    if [[ -f "${ROOTFS_FILE}" ]]; then
+        log_success "RootFS file found locally: ${ROOTFS_FILE}"
+        ls -la "${ROOTFS_FILE}"
+    else
+        log_warning "RootFS file not found locally, ULO-Builder will download: ${ROOTFS_FILE}"
+    fi
     
     cd ULO-Builder
     
