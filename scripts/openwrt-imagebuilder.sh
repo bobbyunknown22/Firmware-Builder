@@ -131,13 +131,6 @@ else
     mkdir -p ../ULO-Builder/rootfs
     cp "$ROOTFS_FILE" "../ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME"
     echo "Copied to: ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME"
-    
-    # Additional strategy: Create an alias with a known working name pattern
-    # This helps bypass ULO-Builder's internal validation
-    FALLBACK_NAME="OpenWrt-${VERSION}-InsomWRT-armsr-armv8-generic-rootfs.tar.gz"
-    cp "$ROOTFS_FILE" "../ULO-Builder/rootfs/$FALLBACK_NAME"
-    echo "Created fallback alias: ULO-Builder/rootfs/$FALLBACK_NAME"
-    echo "FALLBACK_ROOTFS_NAME=$FALLBACK_NAME" >> $GITHUB_ENV
 fi
 
 echo "=== OpenWrt ImageBuilder Complete ==="

@@ -159,13 +159,8 @@ jobs:
           if [ "${{ github.event.inputs.rootfs_type }}" = "ready" ]; then
             ROOTFS_FILE="${{ github.event.inputs.rootfs_filename }}"
           else
-            # For custom rootfs, try primary name first, fallback if needed
+            # For custom rootfs, use the filename from ImageBuilder step
             ROOTFS_FILE="$ROOTFS_FILENAME"
-            # Check if fallback name is available (for ULO-Builder compatibility)
-            if [ -n "$FALLBACK_ROOTFS_NAME" ] && [ -f "ULO-Builder/rootfs/$FALLBACK_ROOTFS_NAME" ]; then
-              echo "Using fallback rootfs name for ULO-Builder compatibility: $FALLBACK_ROOTFS_NAME"
-              ROOTFS_FILE="$FALLBACK_ROOTFS_NAME"
-            fi
           fi
           
           echo "Using rootfs file: $ROOTFS_FILE"

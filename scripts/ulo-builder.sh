@@ -58,43 +58,14 @@ validate_params() {
         exit 1
     fi
 
-    # For ready/pre-built rootfs, ULO-Builder will download automatically
-    # For custom rootfs, check if file exists locally
-    if [[ ! -f "${ROOTFS_FILE}" ]]; then
-        # Check if file exists in common locations for custom builds
-        local possible_locations=(
-            "${ROOTFS_FILE}"
-            "./rootfs/${ROOTFS_FILE}"
-            "./ULO-Builder/rootfs/${ROOTFS_FILE}"
-            "../${ROOTFS_FILE}"
-        )
-        
-        local found_file=""
-        for location in "${possible_locations[@]}"; do
-            if [[ -f "${location}" ]]; then
-                log_info "Found RootFS file at: ${location}"
-                found_file="${location}"
-                break
-            fi
-        done
-        
-        if [[ -z "${found_file}" ]]; then
-            log_warning "RootFS file not found locally: ${ROOTFS_FILE}"
-            log_info "ULO-Builder will attempt to download the rootfs automatically"
-            log_info "Checked locations:"
-            for location in "${possible_locations[@]}"; do
-                log_info "  - ${location}"
-            done
-            echo "Available files in current directory:"
-            ls -la *.tar.gz *.img.gz 2>/dev/null || echo "No rootfs files found locally"
-            
-            # Don't exit, let ULO-Builder handle the download
-            log_info "Continuing with ULO-Builder setup..."
-        else
-            log_success "Will use RootFS file from: ${found_file}"
-        fi
+    # ULO-Builder expects rootfs identifier or will download if not found locally
+    log_info "RootFS yang akan digunakan: ${ROOTFS_FILE}"
+    
+    # Check if custom rootfs exists in ULO-Builder/rootfs directory
+    if [[ -f "ULO-Builder/rootfs/${ROOTFS_FILE}" ]]; then
+        log_success "Custom rootfs ditemukan di ULO-Builder/rootfs/${ROOTFS_FILE}"
     else
-        log_success "RootFS file found: ${ROOTFS_FILE}"
+        log_info "ULO-Builder akan mendownload rootfs: ${ROOTFS_FILE}"
     fi
 }
 
@@ -150,31 +121,10 @@ configure_ulo_builder() {
     
     cd ULO-Builder
     
-    # Enable custom kernel download
-    log_info "Enabling custom kernel download..."
+    # Enable custom downloads - ULO-Builder always downloads kernel and rootfs
+    log_info "Enabling custom kernel and rootfs downloads..."
     sudo sed -i 's/DOWNLOAD_CUSTOM_KERNEL=false/DOWNLOAD_CUSTOM_KERNEL=true/' ulo
-    
-    # Check if using custom rootfs file (local file exists)
-    if [[ -f "../${ROOTFS_FILE}" ]]; then
-        log_info "Custom rootfs file detected locally: ${ROOTFS_FILE}"
-        log_info "Keeping DOWNLOAD_CUSTOM_ROOTFS=false to use local file"
-        
-        # Copy local rootfs to ULO-Builder directory for processing
-        cp "../${ROOTFS_FILE}" "./rootfs/" 2>/dev/null || {
-            mkdir -p rootfs
-            cp "../${ROOTFS_FILE}" "./rootfs/"
-        }
-        if [[ $? -eq 0 ]]; then
-            log_success "Local rootfs file copied to ULO-Builder/rootfs/"
-        else
-            log_warning "Failed to copy local rootfs file, ULO-Builder will try to download"
-            sudo sed -i 's/DOWNLOAD_CUSTOM_ROOTFS=false/DOWNLOAD_CUSTOM_ROOTFS=true/' ulo
-        fi
-    else
-        log_info "No local custom rootfs file found, enabling download"
-        log_info "ULO-Builder will download rootfs: ${ROOTFS_FILE}"
-        sudo sed -i 's/DOWNLOAD_CUSTOM_ROOTFS=false/DOWNLOAD_CUSTOM_ROOTFS=true/' ulo
-    fi
+    sudo sed -i 's/DOWNLOAD_CUSTOM_ROOTFS=false/DOWNLOAD_CUSTOM_ROOTFS=true/' ulo
     
     # Verify configuration
     log_info "Verifying configuration:"
@@ -192,26 +142,12 @@ run_ulo_build() {
     log_info "Patch File: ${PATCH_FILE:-None}"
     log_info "Firmware Size: ${FIRMWARE_SIZE}MB"
     
-    # Check if rootfs file exists before starting build
-    local rootfs_location=""
-    if [[ -f "${ROOTFS_FILE}" ]]; then
-        log_success "RootFS file found in current directory: ${ROOTFS_FILE}"
-        rootfs_location="${ROOTFS_FILE}"
-    elif [[ -f "ULO-Builder/rootfs/${ROOTFS_FILE}" ]]; then
-        log_success "RootFS file found in ULO-Builder/rootfs/: ${ROOTFS_FILE}"
-        rootfs_location="ULO-Builder/rootfs/${ROOTFS_FILE}"
+    # Check if custom rootfs exists in ULO-Builder/rootfs
+    if [[ -f "ULO-Builder/rootfs/${ROOTFS_FILE}" ]]; then
+        log_success "Menggunakan custom rootfs: ${ROOTFS_FILE}"
+        ls -la "ULO-Builder/rootfs/${ROOTFS_FILE}"
     else
-        log_warning "RootFS file not found locally, ULO-Builder will download: ${ROOTFS_FILE}"
-        log_info "Checking available rootfs files in current directory:"
-        ls -la *.tar.gz *.img.gz 2>/dev/null || log_info "No local rootfs files found"
-    fi
-    
-    if [[ -n "${rootfs_location}" ]]; then
-        ls -la "${rootfs_location}"
-        # Additional debug info for ULO-Builder compatibility
-        log_info "File details for ULO-Builder validation:"
-        file "${rootfs_location}" || log_warning "Could not determine file type"
-        log_info "File size: $(stat -c%s "${rootfs_location}" 2>/dev/null || echo 'unknown') bytes"
+        log_info "Custom rootfs tidak ditemukan, ULO-Builder akan download: ${ROOTFS_FILE}"
     fi
     
     cd ULO-Builder
