@@ -58,15 +58,9 @@ validate_params() {
         exit 1
     fi
 
-    # ULO-Builder expects rootfs identifier or will download if not found locally
+    # Basic parameter validation only
     log_info "RootFS yang akan digunakan: ${ROOTFS_FILE}"
-    
-    # Check if custom rootfs exists in ULO-Builder/rootfs directory
-    if [[ -f "ULO-Builder/rootfs/${ROOTFS_FILE}" ]]; then
-        log_success "Custom rootfs ditemukan di ULO-Builder/rootfs/${ROOTFS_FILE}"
-    else
-        log_info "ULO-Builder akan mendownload rootfs: ${ROOTFS_FILE}"
-    fi
+    log_info "Parameter validasi selesai"
 }
 
 # Setup ULO-Builder function
@@ -84,6 +78,22 @@ setup_ulo_builder() {
         exit 1
     fi
     log_success "ULO-Builder repository cloned successfully"
+    
+    # Copy custom rootfs from temporary location if it exists
+    if [[ -f "rootfs-temp/${ROOTFS_FILE}" ]]; then
+        log_info "Moving custom rootfs from temporary location..."
+        mkdir -p ULO-Builder/rootfs
+        cp "rootfs-temp/${ROOTFS_FILE}" "ULO-Builder/rootfs/${ROOTFS_FILE}"
+        if [[ $? -eq 0 ]]; then
+            log_success "Custom rootfs moved to ULO-Builder/rootfs/${ROOTFS_FILE}"
+            # Clean up temporary directory
+            rm -rf rootfs-temp
+        else
+            log_error "Failed to move custom rootfs"
+        fi
+    else
+        log_info "No custom rootfs found in temporary location"
+    fi
 }
 
 # Setup patch function
@@ -121,10 +131,20 @@ configure_ulo_builder() {
     
     cd ULO-Builder
     
-    # Enable custom downloads - ULO-Builder always downloads kernel and rootfs
-    log_info "Enabling custom kernel and rootfs downloads..."
+    # Always enable custom kernel download
+    log_info "Enabling custom kernel download..."
     sudo sed -i 's/DOWNLOAD_CUSTOM_KERNEL=false/DOWNLOAD_CUSTOM_KERNEL=true/' ulo
-    sudo sed -i 's/DOWNLOAD_CUSTOM_ROOTFS=false/DOWNLOAD_CUSTOM_ROOTFS=true/' ulo
+    
+    # Check if custom rootfs exists in rootfs directory
+    if [[ -f "rootfs/${ROOTFS_FILE}" ]]; then
+        log_success "Custom rootfs ditemukan: rootfs/${ROOTFS_FILE}"
+        log_info "Keeping DOWNLOAD_CUSTOM_ROOTFS=false to use local custom rootfs"
+        # Don't enable DOWNLOAD_CUSTOM_ROOTFS, use local file
+    else
+        log_info "Custom rootfs tidak ditemukan, enabling download"
+        log_info "ULO-Builder akan mendownload rootfs: ${ROOTFS_FILE}"
+        sudo sed -i 's/DOWNLOAD_CUSTOM_ROOTFS=false/DOWNLOAD_CUSTOM_ROOTFS=true/' ulo
+    fi
     
     # Verify configuration
     log_info "Verifying configuration:"
@@ -142,12 +162,14 @@ run_ulo_build() {
     log_info "Patch File: ${PATCH_FILE:-None}"
     log_info "Firmware Size: ${FIRMWARE_SIZE}MB"
     
-    # Check if custom rootfs exists in ULO-Builder/rootfs
+    # Final check for custom rootfs in ULO-Builder/rootfs
     if [[ -f "ULO-Builder/rootfs/${ROOTFS_FILE}" ]]; then
-        log_success "Menggunakan custom rootfs: ${ROOTFS_FILE}"
+        log_success "✅ Menggunakan custom rootfs: ${ROOTFS_FILE}"
+        log_info "File size: $(stat -c%s "ULO-Builder/rootfs/${ROOTFS_FILE}" 2>/dev/null || echo 'unknown') bytes"
         ls -la "ULO-Builder/rootfs/${ROOTFS_FILE}"
     else
-        log_info "Custom rootfs tidak ditemukan, ULO-Builder akan download: ${ROOTFS_FILE}"
+        log_warning "❌ Custom rootfs tidak ditemukan di ULO-Builder/rootfs/"
+        log_info "ULO-Builder akan mendownload rootfs standard dan mencari: ${ROOTFS_FILE}"
     fi
     
     cd ULO-Builder

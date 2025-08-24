@@ -127,10 +127,11 @@ if [ "$BUILDER_TYPE" = "ophub" ]; then
     echo "Copied to: ../$CUSTOM_ROOTFS_NAME"
 else
     echo "Copying rootfs for ULO-Builder..."
-    # For ULO, copy to ULO-Builder/rootfs as before
-    mkdir -p ../ULO-Builder/rootfs
-    cp "$ROOTFS_FILE" "../ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME"
-    echo "Copied to: ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME"
+    # For ULO, copy to temporary directory first (ULO-Builder will be cloned later)
+    mkdir -p ../rootfs-temp
+    cp "$ROOTFS_FILE" "../rootfs-temp/$CUSTOM_ROOTFS_NAME"
+    echo "Copied to temporary location: rootfs-temp/$CUSTOM_ROOTFS_NAME"
+    echo "ULO-Builder script will copy this to ULO-Builder/rootfs/ after cloning"
 fi
 
 echo "=== OpenWrt ImageBuilder Complete ==="
@@ -138,7 +139,7 @@ echo "Generated: $CUSTOM_ROOTFS_NAME"
 if [ "$BUILDER_TYPE" = "ophub" ]; then
     echo "Location: ../$CUSTOM_ROOTFS_NAME (for Ophub Builder)"
 else
-    echo "Location: ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME (for ULO-Builder)"
+    echo "Location: rootfs-temp/$CUSTOM_ROOTFS_NAME (temporary, will be moved to ULO-Builder/rootfs/)"
 fi
 
 # Export environment variable for GitHub Actions
