@@ -59,7 +59,7 @@ validate_params() {
     fi
 
     # For ready/pre-built rootfs, ULO-Builder will download automatically
-    # Skip file validation for now, let ULO-Builder handle the download
+    # For custom rootfs, check if file exists locally
     if [[ ! -f "${ROOTFS_FILE}" ]]; then
         # Check if file exists in common locations for custom builds
         local possible_locations=(
@@ -73,12 +73,8 @@ validate_params() {
         for location in "${possible_locations[@]}"; do
             if [[ -f "${location}" ]]; then
                 log_info "Found RootFS file at: ${location}"
-                cp "${location}" "${ROOTFS_FILE}"
-                if [[ $? -eq 0 ]]; then
-                    log_success "RootFS file copied from ${location}"
-                    found_file="${ROOTFS_FILE}"
-                    break
-                fi
+                found_file="${location}"
+                break
             fi
         done
         
@@ -94,7 +90,11 @@ validate_params() {
             
             # Don't exit, let ULO-Builder handle the download
             log_info "Continuing with ULO-Builder setup..."
+        else
+            log_success "Will use RootFS file from: ${found_file}"
         fi
+    else
+        log_success "RootFS file found: ${ROOTFS_FILE}"
     fi
 }
 
@@ -150,10 +150,31 @@ configure_ulo_builder() {
     
     cd ULO-Builder
     
-    # Enable custom downloads
-    log_info "Enabling custom downloads..."
+    # Enable custom kernel download
+    log_info "Enabling custom kernel download..."
     sudo sed -i 's/DOWNLOAD_CUSTOM_KERNEL=false/DOWNLOAD_CUSTOM_KERNEL=true/' ulo
-    sudo sed -i 's/DOWNLOAD_CUSTOM_ROOTFS=false/DOWNLOAD_CUSTOM_ROOTFS=true/' ulo
+    
+    # Check if using custom rootfs file (local file exists)
+    if [[ -f "../${ROOTFS_FILE}" ]]; then
+        log_info "Custom rootfs file detected locally: ${ROOTFS_FILE}"
+        log_info "Keeping DOWNLOAD_CUSTOM_ROOTFS=false to use local file"
+        
+        # Copy local rootfs to ULO-Builder directory for processing
+        cp "../${ROOTFS_FILE}" "./rootfs/" 2>/dev/null || {
+            mkdir -p rootfs
+            cp "../${ROOTFS_FILE}" "./rootfs/"
+        }
+        if [[ $? -eq 0 ]]; then
+            log_success "Local rootfs file copied to ULO-Builder/rootfs/"
+        else
+            log_warning "Failed to copy local rootfs file, ULO-Builder will try to download"
+            sudo sed -i 's/DOWNLOAD_CUSTOM_ROOTFS=false/DOWNLOAD_CUSTOM_ROOTFS=true/' ulo
+        fi
+    else
+        log_info "No local custom rootfs file found, enabling download"
+        log_info "ULO-Builder will download rootfs: ${ROOTFS_FILE}"
+        sudo sed -i 's/DOWNLOAD_CUSTOM_ROOTFS=false/DOWNLOAD_CUSTOM_ROOTFS=true/' ulo
+    fi
     
     # Verify configuration
     log_info "Verifying configuration:"
@@ -172,17 +193,25 @@ run_ulo_build() {
     log_info "Firmware Size: ${FIRMWARE_SIZE}MB"
     
     # Check if rootfs file exists before starting build
+    local rootfs_location=""
     if [[ -f "${ROOTFS_FILE}" ]]; then
-        log_success "RootFS file found locally: ${ROOTFS_FILE}"
-        ls -la "${ROOTFS_FILE}"
-        # Additional debug info for ULO-Builder compatibility
-        log_info "File details for ULO-Builder validation:"
-        file "${ROOTFS_FILE}" || log_warning "Could not determine file type"
-        log_info "File size: $(stat -c%s "${ROOTFS_FILE}" 2>/dev/null || echo 'unknown') bytes"
+        log_success "RootFS file found in current directory: ${ROOTFS_FILE}"
+        rootfs_location="${ROOTFS_FILE}"
+    elif [[ -f "ULO-Builder/rootfs/${ROOTFS_FILE}" ]]; then
+        log_success "RootFS file found in ULO-Builder/rootfs/: ${ROOTFS_FILE}"
+        rootfs_location="ULO-Builder/rootfs/${ROOTFS_FILE}"
     else
         log_warning "RootFS file not found locally, ULO-Builder will download: ${ROOTFS_FILE}"
         log_info "Checking available rootfs files in current directory:"
         ls -la *.tar.gz *.img.gz 2>/dev/null || log_info "No local rootfs files found"
+    fi
+    
+    if [[ -n "${rootfs_location}" ]]; then
+        ls -la "${rootfs_location}"
+        # Additional debug info for ULO-Builder compatibility
+        log_info "File details for ULO-Builder validation:"
+        file "${rootfs_location}" || log_warning "Could not determine file type"
+        log_info "File size: $(stat -c%s "${rootfs_location}" 2>/dev/null || echo 'unknown') bytes"
     fi
     
     cd ULO-Builder
