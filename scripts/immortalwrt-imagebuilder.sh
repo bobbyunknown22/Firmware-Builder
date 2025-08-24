@@ -126,17 +126,11 @@ if [ "$BUILDER_TYPE" = "ophub" ]; then
     echo "Copied to: ../$CUSTOM_ROOTFS_NAME"
 else
     echo "Copying rootfs for ULO-Builder..."
-    # For ULO, copy to ULO-Builder/rootfs as before
-    mkdir -p ../ULO-Builder/rootfs
-    cp "$ROOTFS_FILE" "../ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME"
-    echo "Copied to: ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME"
-    
-    # Additional strategy: Create an alias with OpenWrt naming (ULO might prefer OpenWrt)
-    # This helps bypass ULO-Builder's internal validation
-    FALLBACK_NAME="OpenWrt-${VERSION}-Custom-armsr-armv8-generic-rootfs.tar.gz"
-    cp "$ROOTFS_FILE" "../ULO-Builder/rootfs/$FALLBACK_NAME"
-    echo "Created fallback alias: ULO-Builder/rootfs/$FALLBACK_NAME"
-    echo "FALLBACK_ROOTFS_NAME=$FALLBACK_NAME" >> $GITHUB_ENV
+    # For ULO, copy to temporary directory first (ULO-Builder will be cloned later)
+    mkdir -p ../rootfs-temp
+    cp "$ROOTFS_FILE" "../rootfs-temp/$CUSTOM_ROOTFS_NAME"
+    echo "Copied to temporary location: rootfs-temp/$CUSTOM_ROOTFS_NAME"
+    echo "ULO-Builder script will copy this to ULO-Builder/rootfs/ after cloning"
 fi
 
 echo "=== ImmortalWrt ImageBuilder Complete ==="
@@ -144,7 +138,7 @@ echo "Generated: $CUSTOM_ROOTFS_NAME"
 if [ "$BUILDER_TYPE" = "ophub" ]; then
     echo "Location: ../$CUSTOM_ROOTFS_NAME (for Ophub Builder)"
 else
-    echo "Location: ULO-Builder/rootfs/$CUSTOM_ROOTFS_NAME (for ULO-Builder)"
+    echo "Location: rootfs-temp/$CUSTOM_ROOTFS_NAME (temporary, will be moved to ULO-Builder/rootfs/)"
 fi
 
 # Export environment variable for GitHub Actions
