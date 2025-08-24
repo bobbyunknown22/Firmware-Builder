@@ -175,8 +175,14 @@ run_ulo_build() {
     if [[ -f "${ROOTFS_FILE}" ]]; then
         log_success "RootFS file found locally: ${ROOTFS_FILE}"
         ls -la "${ROOTFS_FILE}"
+        # Additional debug info for ULO-Builder compatibility
+        log_info "File details for ULO-Builder validation:"
+        file "${ROOTFS_FILE}" || log_warning "Could not determine file type"
+        log_info "File size: $(stat -c%s "${ROOTFS_FILE}" 2>/dev/null || echo 'unknown') bytes"
     else
         log_warning "RootFS file not found locally, ULO-Builder will download: ${ROOTFS_FILE}"
+        log_info "Checking available rootfs files in current directory:"
+        ls -la *.tar.gz *.img.gz 2>/dev/null || log_info "No local rootfs files found"
     fi
     
     cd ULO-Builder

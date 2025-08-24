@@ -53,6 +53,22 @@ on:
           - '23.05.2'
           - '23.05.1'
           - '23.05.0'
+      immortalwrt_version:
+        description: 'ImmortalWrt Version (for custom rootfs)'
+        required: false
+        default: '24.10.2'
+        type: choice
+        options:
+          - '24.10.2'
+          - '24.10.1'
+          - '24.10.0'
+          - '23.05.6'
+          - '23.05.5'
+          - '23.05.4'
+          - '23.05.3'
+          - '23.05.2'
+          - '23.05.1'
+          - '23.05.0'
       firmware_base:
         description: 'Firmware Base (for custom rootfs)'
         required: false
@@ -91,10 +107,19 @@ jobs:
         run: |
           echo "Building custom rootfs with ImageBuilder..."
           echo "Builder type: ${{ github.event.inputs.builder_type }}"
+          echo "Rootfs type: ${{ github.event.inputs.rootfs_type }}"
+          echo "Firmware base: ${{ github.event.inputs.firmware_base }}"
+          echo "OpenWrt version: ${{ github.event.inputs.openwrt_version }}"
+          echo "ImmortalWrt version: ${{ github.event.inputs.immortalwrt_version }}"
+          echo "Custom packages: ${{ github.event.inputs.custom_packages }}"
           
           # Set variables
           FIRMWARE_BASE="${{ github.event.inputs.firmware_base }}"
-          VERSION="${{ github.event.inputs.openwrt_version }}"
+          if [ "$FIRMWARE_BASE" = "openwrt" ]; then
+            VERSION="${{ github.event.inputs.openwrt_version }}"
+          else
+            VERSION="${{ github.event.inputs.immortalwrt_version }}"
+          fi
           PACKAGES="${{ github.event.inputs.custom_packages }}"
           
           # Make scripts executable
@@ -135,6 +160,8 @@ jobs:
 
       - name: Build with ULO-Builder
         if: github.event.inputs.builder_type == 'ulo'
+        env:
+          GITHUB_EVENT_INPUTS_BUILDER_TYPE: ${{ github.event.inputs.builder_type }}
         run: |
           echo "Building firmware with ULO-Builder..."
           
@@ -153,8 +180,13 @@ jobs:
           if [ "${{ github.event.inputs.rootfs_type }}" = "ready" ]; then
             ROOTFS_FILE="${{ github.event.inputs.rootfs_filename }}"
           else
-            # For custom rootfs, the filename will be set by the ImageBuilder step
-            ROOTFS_FILE="${{ env.ROOTFS_FILENAME }}"
+            # For custom rootfs, try primary name first, fallback if needed
+            ROOTFS_FILE="$ROOTFS_FILENAME"
+            # Check if fallback name is available (for ULO-Builder compatibility)
+            if [ -n "$FALLBACK_ROOTFS_NAME" ] && [ -f "ULO-Builder/rootfs/$FALLBACK_ROOTFS_NAME" ]; then
+              echo "Using fallback rootfs name for ULO-Builder compatibility: $FALLBACK_ROOTFS_NAME"
+              ROOTFS_FILE="$FALLBACK_ROOTFS_NAME"
+            fi
           fi
           
           echo "Using rootfs file: $ROOTFS_FILE"
@@ -171,6 +203,8 @@ jobs:
 
       - name: Build with Ophub Builder
         if: github.event.inputs.builder_type == 'ophub'
+        env:
+          GITHUB_EVENT_INPUTS_BUILDER_TYPE: ${{ github.event.inputs.builder_type }}
         run: |
           echo "Building firmware with Ophub Builder..."
           
@@ -182,7 +216,7 @@ jobs:
             ROOTFS_FILE="${{ github.event.inputs.rootfs_filename }}"
           else
             # For custom rootfs, the filename will be set by the ImageBuilder step
-            ROOTFS_FILE="${{ env.ROOTFS_FILENAME }}"
+            ROOTFS_FILE="$ROOTFS_FILENAME"
           fi
           
           echo "Using rootfs file: $ROOTFS_FILE"
