@@ -89,8 +89,10 @@ download_rootfs() {
         log_warning "Failed to fetch releases from GitHub API"
     else
         # Parse JSON to find download URL for the specific file
+        # First, find the asset entry that contains our filename
         local download_url=$(echo "${releases_json}" | \
-            grep -o '"browser_download_url":"[^"]*'"${rootfs_filename}"'"' | \
+            grep -A 60 "\"name\": \"${rootfs_filename}\"" | \
+            grep "browser_download_url" | \
             head -n1 | \
             cut -d'"' -f4)
         
@@ -98,7 +100,7 @@ download_rootfs() {
             log_info "Found file in releases: ${download_url}"
             log_info "Downloading from GitHub releases..."
             
-            if wget -O "${rootfs_filename}" "${download_url}" --progress=bar:force 2>&1; then
+            if curl -L -o "${rootfs_filename}" "${download_url}" --progress-bar; then
                 if [[ -f "${rootfs_filename}" ]] && [[ -s "${rootfs_filename}" ]]; then
                     log_success "Downloaded from GitHub releases successfully"
                     return 0
@@ -111,6 +113,13 @@ download_rootfs() {
             fi
         else
             log_info "File not found in any GitHub releases"
+            # Debug: show what files are actually available
+            log_info "Available files in releases:"
+            echo "${releases_json}" | \
+                grep '"name":' | \
+                grep '\.tar\.gz' | \
+                sed 's/.*"name": "\([^"]*\)".*/\1/' | \
+                head -10
         fi
     fi
     
@@ -119,9 +128,9 @@ download_rootfs() {
     local ulo_repo_url="https://github.com/armarchindo/ULO-repository/raw/main/rootfs/${rootfs_filename}"
     log_info "Checking ULO-repository: ${ulo_repo_url}"
     
-    if wget -q --spider "${ulo_repo_url}" 2>/dev/null; then
+    if curl -s --head "${ulo_repo_url}" | head -n 1 | grep -q "200 OK"; then
         log_info "Found in ULO-repository, downloading..."
-        if wget -O "${rootfs_filename}" "${ulo_repo_url}" --progress=bar:force 2>&1; then
+        if curl -L -o "${rootfs_filename}" "${ulo_repo_url}" --progress-bar; then
             if [[ -f "${rootfs_filename}" ]] && [[ -s "${rootfs_filename}" ]]; then
                 log_success "Downloaded from ULO-repository successfully"
                 return 0
@@ -148,8 +157,9 @@ download_rootfs() {
     log_info "Available files in recent releases:"
     if [[ -n "${releases_json}" ]]; then
         echo "${releases_json}" | \
-            grep -o '"name":"[^"]*\.tar\.gz"' | \
-            cut -d'"' -f4 | \
+            grep '"name":' | \
+            grep '\.tar\.gz' | \
+            sed 's/.*"name": "\([^"]*\)".*/\1/' | \
             head -10
     else
         log_warning "Could not fetch release information"
@@ -158,8 +168,9 @@ download_rootfs() {
     # Check ULO-repository directory
     log_info "Available files in ULO-repository:"
     curl -s "https://api.github.com/repos/armarchindo/ULO-repository/contents/rootfs" 2>/dev/null | \
-        grep -o '"name":"[^"]*\.tar\.gz"' | \
-        cut -d'"' -f4 | \
+        grep '"name":' | \
+        grep '\.tar\.gz' | \
+        sed 's/.*"name": "\([^"]*\)".*/\1/' | \
         head -10 || log_warning "Could not list ULO-repository files"
     
     return 1
