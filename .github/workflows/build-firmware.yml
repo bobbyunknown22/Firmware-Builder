@@ -33,10 +33,7 @@ on:
         description: 'Pre-built Rootfs filename (for ready type)'
         required: false
         default: 'openwrt-23.05.5-vanila-armsr-armv8-generic-ext4-rootfs.img.gz'
-      firmware_size:
-        description: 'Firmware Size (MB)'
-        required: false
-        default: '1024'
+
       os_version:
         description: 'OS Version (for custom rootfs)'
         required: false
@@ -164,7 +161,7 @@ jobs:
             ROOTFS_FILE="${{ github.event.inputs.rootfs_filename }}"
           else
             # For custom rootfs, use the filename from ImageBuilder step
-            ROOTFS_FILE="$ROOTFS_FILENAME"
+            ROOTFS_FILE="${ROOTFS_FILENAME:-custom-rootfs.img.gz}"
           fi
           
           echo "Using rootfs file: $ROOTFS_FILE"
@@ -175,7 +172,7 @@ jobs:
             "${{ github.event.inputs.kernel_version }}" \
             "$ROOTFS_FILE" \
             "$PATCH_FILE" \
-            "${{ github.event.inputs.firmware_size }}" \
+            "1024" \
             "${{ github.event.inputs.build_id }}"
           
           echo "ULO-Builder completed successfully!"
@@ -195,7 +192,7 @@ jobs:
             ROOTFS_FILE="${{ github.event.inputs.rootfs_filename }}"
           else
             # For custom rootfs, the filename will be set by the ImageBuilder step
-            ROOTFS_FILE="$ROOTFS_FILENAME"
+            ROOTFS_FILE="${ROOTFS_FILENAME:-custom-rootfs.img.gz}"
           fi
           
           echo "Using rootfs file: $ROOTFS_FILE"
@@ -204,7 +201,7 @@ jobs:
           ./scripts/ophub-builder.sh \
             "${{ github.event.inputs.target_device }}" \
             "$ROOTFS_FILE" \
-            "${{ github.event.inputs.firmware_size }}" \
+            "1024" \
             "${{ github.event.inputs.build_id }}"
           
           echo "Ophub Builder completed successfully!"
@@ -224,13 +221,13 @@ jobs:
             - **Builder Type**: ${{ github.event.inputs.builder_type == 'ulo' && 'ULO-Builder' || 'Ophub Builder' }}
             - **Target Device**: ${{ github.event.inputs.target_device }}
             ${{ github.event.inputs.builder_type == 'ulo' && format('- **Kernel Version**: {0}', github.event.inputs.kernel_version) || '' }}
-            - **Firmware Size**: ${{ github.event.inputs.firmware_size }}MB
+            - **Firmware Size**: 1024MB
             
             **RootFS Configuration:**
             - **RootFS Type**: ${{ github.event.inputs.rootfs_type }}
             - **RootFS File**: ${{ env.ROOTFS_FILENAME }}
             ${{ github.event.inputs.rootfs_type == 'custom' && format('- **Firmware Base**: {0}', github.event.inputs.firmware_base) || '' }}
-            ${{ github.event.inputs.rootfs_type == 'custom' && format('- **OpenWrt Version**: {0}', github.event.inputs.openwrt_version) || '' }}
+            ${{ github.event.inputs.rootfs_type == 'custom' && format('- **OS Version**: {0}', github.event.inputs.os_version) || '' }}
             ${{ github.event.inputs.custom_packages != '' && format('- **Custom Packages**: {0}', github.event.inputs.custom_packages) || '- **Custom Packages**: None' }}
             ${{ github.event.inputs.builder_type == 'ulo' && github.event.inputs.patch_filename != '' && format('- **Patch**: {0}', github.event.inputs.patch_filename) || '' }}
             ${{ github.event.inputs.builder_type == 'ulo' && github.event.inputs.patch_filename == '' && '- **Patch**: None' || '' }}
