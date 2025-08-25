@@ -173,6 +173,7 @@ jobs:
             "$ROOTFS_FILE" \
             "$PATCH_FILE" \
             "1024" \
+            "${{ github.actor }}" \
             "${{ github.event.inputs.build_id }}"
           
           echo "ULO-Builder completed successfully!"
@@ -202,7 +203,8 @@ jobs:
             "${{ github.event.inputs.target_device }}" \
             "$ROOTFS_FILE" \
             "1024" \
-            "${{ github.actor }}"
+            "${{ github.actor }}" \
+            "${{ github.event.inputs.build_id }}"
           
           echo "Ophub Builder completed successfully!"
 

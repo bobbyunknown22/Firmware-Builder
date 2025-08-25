@@ -3,8 +3,8 @@
 #================================================================================================
 # ULO Builder Script
 # Description: Build OpenWrt firmware using ULO-Builder repository
-# Usage: ./ulo-builder.sh [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE] [USER_NAME]
-# Example: ./ulo-builder.sh h618-orangepi-zero3 6.1.104-AW64-DBAI openwrt-rootfs.tar.gz patch.zip 1024 "John Doe"
+# Usage: ./ulo-builder.sh [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE] [USER_NAME] [BUILD_ID]
+# Example: ./ulo-builder.sh h618-orangepi-zero3 6.1.104-AW64-DBAI openwrt-rootfs.tar.gz patch.zip 1024 "John Doe" "c94b2282-2993-47d5-b293-c653f852b2b5"
 #================================================================================================
 
 # Set script parameters
@@ -14,6 +14,7 @@ ROOTFS_FILE="${3}"
 PATCH_FILE="${4}"
 FIRMWARE_SIZE="${5:-1024}"
 USER_NAME="${6:-Unknown User}"
+BUILD_ID="${7:-}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -43,25 +44,28 @@ log_error() {
 validate_params() {
     if [[ -z "${TARGET_DEVICE}" ]]; then
         log_error "Target device is required"
-        echo "Usage: $0 [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE] [USER_NAME]"
+        echo "Usage: $0 [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE] [USER_NAME] [BUILD_ID]"
         exit 1
     fi
 
     if [[ -z "${KERNEL_VERSION}" ]]; then
         log_error "Kernel version is required"
-        echo "Usage: $0 [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE] [USER_NAME]"
+        echo "Usage: $0 [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE] [USER_NAME] [BUILD_ID]"
         exit 1
     fi
 
     if [[ -z "${ROOTFS_FILE}" ]]; then
         log_error "RootFS file is required"
-        echo "Usage: $0 [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE] [USER_NAME]"
+        echo "Usage: $0 [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE] [USER_NAME] [BUILD_ID]"
         exit 1
     fi
 
     # Basic parameter validation only
     log_info "RootFS yang akan digunakan: ${ROOTFS_FILE}"
     log_info "Built by: ${USER_NAME}"
+    if [[ -n "${BUILD_ID}" ]]; then
+        log_info "Build ID: ${BUILD_ID}"
+    fi
     log_info "Parameter validasi selesai"
 }
 

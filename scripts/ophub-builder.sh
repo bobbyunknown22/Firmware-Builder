@@ -3,8 +3,8 @@
 #================================================================================================
 # Ophub Builder Script
 # Description: Build OpenWrt firmware using Ophub amlogic-s9xxx-openwrt repository
-# Usage: ./ophub-builder.sh [TARGET_DEVICE] [ROOTFS_FILE] [FIRMWARE_SIZE] [USER_NAME]
-# Example: ./ophub-builder.sh s905x openwrt-rootfs.tar.gz 1024 "John Doe"
+# Usage: ./ophub-builder.sh [TARGET_DEVICE] [ROOTFS_FILE] [FIRMWARE_SIZE] [USER_NAME] [BUILD_ID]
+# Example: ./ophub-builder.sh s905x openwrt-rootfs.tar.gz 1024 "John Doe" "c94b2282-2993-47d5-b293-c653f852b2b5"
 #================================================================================================
 
 # Set script parameters
@@ -12,6 +12,7 @@ TARGET_DEVICE="${1}"
 ROOTFS_FILE="${2}"
 FIRMWARE_SIZE="${3:-1024}"
 USER_NAME="${4:-Unknown User}"
+BUILD_ID="${5:-}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -226,6 +227,9 @@ main() {
     log_info "Target Device: ${TARGET_DEVICE}"
     log_info "RootFS File: ${ROOTFS_FILE}"
     log_info "Firmware Size: ${FIRMWARE_SIZE}MB"
+    if [[ -n "${BUILD_ID}" ]]; then
+        log_info "Build ID: ${BUILD_ID}"
+    fi
     
     # Validate parameters
     validate_params
