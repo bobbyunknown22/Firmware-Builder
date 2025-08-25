@@ -77,16 +77,57 @@ download_rootfs() {
     
     log_info "Downloading RootFS: ${rootfs_filename}"
     
-    # Try downloading from ULO-repository first
+    # Primary source: rootfs-openwrt releases (GitHub Releases API)
+    log_info "Trying rootfs-openwrt releases (primary source)..."
+    local releases_api="https://api.github.com/repos/armarchindo/rootfs-openwrt/releases"
+    
+    # Get all releases and find the download URL for our file
+    log_info "Fetching releases from: ${releases_api}"
+    local releases_json=$(curl -s "${releases_api}")
+    
+    if [[ $? -ne 0 ]] || [[ -z "${releases_json}" ]]; then
+        log_warning "Failed to fetch releases from GitHub API"
+    else
+        # Parse JSON to find download URL for the specific file
+        local download_url=$(echo "${releases_json}" | \
+            grep -o '"browser_download_url":"[^"]*'"${rootfs_filename}"'"' | \
+            head -n1 | \
+            cut -d'"' -f4)
+        
+        if [[ -n "${download_url}" ]]; then
+            log_info "Found file in releases: ${download_url}"
+            log_info "Downloading from GitHub releases..."
+            
+            if wget -O "${rootfs_filename}" "${download_url}" --progress=bar:force 2>&1; then
+                if [[ -f "${rootfs_filename}" ]] && [[ -s "${rootfs_filename}" ]]; then
+                    log_success "Downloaded from GitHub releases successfully"
+                    return 0
+                else
+                    log_warning "Downloaded file is empty or corrupted"
+                    rm -f "${rootfs_filename}"
+                fi
+            else
+                log_warning "Download from GitHub releases failed"
+            fi
+        else
+            log_info "File not found in any GitHub releases"
+        fi
+    fi
+    
+    # Secondary source: ULO-repository (fallback)
+    log_info "Trying ULO-repository (fallback source)..."
     local ulo_repo_url="https://github.com/armarchindo/ULO-repository/raw/main/rootfs/${rootfs_filename}"
-    log_info "Trying ULO-repository: ${ulo_repo_url}"
+    log_info "Checking ULO-repository: ${ulo_repo_url}"
     
     if wget -q --spider "${ulo_repo_url}" 2>/dev/null; then
         log_info "Found in ULO-repository, downloading..."
         if wget -O "${rootfs_filename}" "${ulo_repo_url}" --progress=bar:force 2>&1; then
-            if [[ -f "${rootfs_filename}" ]]; then
+            if [[ -f "${rootfs_filename}" ]] && [[ -s "${rootfs_filename}" ]]; then
                 log_success "Downloaded from ULO-repository successfully"
                 return 0
+            else
+                log_warning "Downloaded file is empty or corrupted"
+                rm -f "${rootfs_filename}"
             fi
         fi
         log_warning "Download from ULO-repository failed"
@@ -94,44 +135,32 @@ download_rootfs() {
         log_info "File not found in ULO-repository"
     fi
     
-    # Try downloading from rootfs-openwrt releases
-    log_info "Trying rootfs-openwrt releases..."
-    local releases_api="https://api.github.com/repos/armarchindo/rootfs-openwrt/releases"
+    # If all downloads failed, provide debugging information
+    log_error "Failed to download RootFS: ${rootfs_filename}"
+    log_info "All sources checked:"
+    log_info "1. Primary: rootfs-openwrt releases API: ${releases_api}"
+    log_info "2. Fallback: ULO-repository: ${ulo_repo_url}"
     
-    # Get the download URL from releases
-    local download_url=$(curl -s "${releases_api}" | \
-        grep -o '"browser_download_url": "[^"]*'"${rootfs_filename}"'"' | \
-        cut -d'"' -f4 | head -n1)
+    # List available files for debugging
+    log_info "Debugging: Listing available files..."
     
-    if [[ -n "${download_url}" ]]; then
-        log_info "Found in releases: ${download_url}"
-        if wget -O "${rootfs_filename}" "${download_url}" --progress=bar:force 2>&1; then
-            if [[ -f "${rootfs_filename}" ]]; then
-                log_success "Downloaded from releases successfully"
-                return 0
-            fi
-        fi
-        log_warning "Download from releases failed"
+    # Check recent releases for available files
+    log_info "Available files in recent releases:"
+    if [[ -n "${releases_json}" ]]; then
+        echo "${releases_json}" | \
+            grep -o '"name":"[^"]*\.tar\.gz"' | \
+            cut -d'"' -f4 | \
+            head -10
     else
-        log_info "File not found in releases"
+        log_warning "Could not fetch release information"
     fi
     
-    log_error "Failed to download RootFS: ${rootfs_filename}"
-    log_info "Available sources checked:"
-    log_info "1. ULO-repository: ${ulo_repo_url}"
-    log_info "2. rootfs-openwrt releases API: ${releases_api}"
-    
-    # List available files from both sources for debugging
-    log_info "Attempting to list available files for debugging..."
-    
-    # Check ULO-repository directory listing
-    log_info "Checking ULO-repository directory:"
-    curl -s "https://api.github.com/repos/armarchindo/ULO-repository/contents/rootfs" | \
-        grep '"name":' | head -10 || log_warning "Could not list ULO-repository files"
-    
-    # Check recent releases
-    log_info "Checking recent releases:"
-    curl -s "${releases_api}" | grep '"name":' | head -5 || log_warning "Could not list recent releases"
+    # Check ULO-repository directory
+    log_info "Available files in ULO-repository:"
+    curl -s "https://api.github.com/repos/armarchindo/ULO-repository/contents/rootfs" 2>/dev/null | \
+        grep -o '"name":"[^"]*\.tar\.gz"' | \
+        cut -d'"' -f4 | \
+        head -10 || log_warning "Could not list ULO-repository files"
     
     return 1
 }
