@@ -3,14 +3,15 @@
 #================================================================================================
 # Ophub Builder Script
 # Description: Build OpenWrt firmware using Ophub amlogic-s9xxx-openwrt repository
-# Usage: ./ophub-builder.sh [TARGET_DEVICE] [ROOTFS_FILE] [FIRMWARE_SIZE]
-# Example: ./ophub-builder.sh s905x openwrt-rootfs.tar.gz 1024
+# Usage: ./ophub-builder.sh [TARGET_DEVICE] [ROOTFS_FILE] [FIRMWARE_SIZE] [USER_NAME]
+# Example: ./ophub-builder.sh s905x openwrt-rootfs.tar.gz 1024 "John Doe"
 #================================================================================================
 
 # Set script parameters
 TARGET_DEVICE="${1}"
 ROOTFS_FILE="${2}"
 FIRMWARE_SIZE="${3:-1024}"
+USER_NAME="${4:-Unknown User}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -164,18 +165,19 @@ handle_rootfs_format() {
 validate_params() {
     if [[ -z "${TARGET_DEVICE}" ]]; then
         log_error "Target device is required"
-        echo "Usage: $0 [TARGET_DEVICE] [ROOTFS_FILE] [FIRMWARE_SIZE]"
+        echo "Usage: $0 [TARGET_DEVICE] [ROOTFS_FILE] [FIRMWARE_SIZE] [USER_NAME]"
         exit 1
     fi
 
     if [[ -z "${ROOTFS_FILE}" ]]; then
         log_error "RootFS file is required"
-        echo "Usage: $0 [TARGET_DEVICE] [ROOTFS_FILE] [FIRMWARE_SIZE]"
+        echo "Usage: $0 [TARGET_DEVICE] [ROOTFS_FILE] [FIRMWARE_SIZE] [USER_NAME]"
         exit 1
     fi
 
     # Note: We don't check if file exists here since we'll download it if needed
     log_info "Parameters validated successfully"
+    log_info "Built by: ${USER_NAME}"
 }
 
 # Main function
@@ -282,16 +284,25 @@ main() {
             # Create output directory
             mkdir -p ../ophub-output
             
-            # Copy only .img.gz files to avoid duplicates
-            find openwrt/out -name "*.img.gz" -exec cp {} ../ophub-output/ \;
+            # Create sanitized user name for filename (replace spaces and special chars)
+            SAFE_USER_NAME=$(echo "${USER_NAME}" | tr ' ' '_' | sed 's/[^a-zA-Z0-9_-]//g')
+            
+            # Copy and rename files to include user name
+            find openwrt/out -name "*.img.gz" | while read file; do
+                filename=$(basename "$file")
+                # Insert user name before the file extension
+                new_filename="${filename%.img.gz}_by_${SAFE_USER_NAME}.img.gz"
+                cp "$file" "../ophub-output/$new_filename"
+                log_success "Built: $new_filename"
+            done
             
             # Also copy .img files if they exist
-            find openwrt/out -name "*.img" -exec cp {} ../ophub-output/ \; 2>/dev/null || true
-            
-            # List output files
-            log_info "Output files:"
-            find ../ophub-output -name "*.img.gz" -o -name "*.img" | while read file; do
-                log_success "Built: $(basename "$file")"
+            find openwrt/out -name "*.img" | while read file; do
+                filename=$(basename "$file")
+                # Insert user name before the file extension
+                new_filename="${filename%.img}_by_${SAFE_USER_NAME}.img"
+                cp "$file" "../ophub-output/$new_filename" 2>/dev/null || true
+                log_success "Built: $new_filename"
             done
             
             log_success "Output files copied to ../ophub-output/"

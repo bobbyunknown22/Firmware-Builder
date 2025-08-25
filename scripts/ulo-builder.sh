@@ -3,8 +3,8 @@
 #================================================================================================
 # ULO Builder Script
 # Description: Build OpenWrt firmware using ULO-Builder repository
-# Usage: ./ulo-builder.sh [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE]
-# Example: ./ulo-builder.sh h618-orangepi-zero3 6.1.104-AW64-DBAI openwrt-rootfs.tar.gz patch.zip 1024
+# Usage: ./ulo-builder.sh [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE] [USER_NAME]
+# Example: ./ulo-builder.sh h618-orangepi-zero3 6.1.104-AW64-DBAI openwrt-rootfs.tar.gz patch.zip 1024 "John Doe"
 #================================================================================================
 
 # Set script parameters
@@ -13,6 +13,7 @@ KERNEL_VERSION="${2}"
 ROOTFS_FILE="${3}"
 PATCH_FILE="${4}"
 FIRMWARE_SIZE="${5:-1024}"
+USER_NAME="${6:-Unknown User}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -42,24 +43,25 @@ log_error() {
 validate_params() {
     if [[ -z "${TARGET_DEVICE}" ]]; then
         log_error "Target device is required"
-        echo "Usage: $0 [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE]"
+        echo "Usage: $0 [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE] [USER_NAME]"
         exit 1
     fi
 
     if [[ -z "${KERNEL_VERSION}" ]]; then
         log_error "Kernel version is required"
-        echo "Usage: $0 [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE]"
+        echo "Usage: $0 [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE] [USER_NAME]"
         exit 1
     fi
 
     if [[ -z "${ROOTFS_FILE}" ]]; then
         log_error "RootFS file is required"
-        echo "Usage: $0 [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE]"
+        echo "Usage: $0 [TARGET_DEVICE] [KERNEL_VERSION] [ROOTFS_FILE] [PATCH_FILE] [FIRMWARE_SIZE] [USER_NAME]"
         exit 1
     fi
 
     # Basic parameter validation only
     log_info "RootFS yang akan digunakan: ${ROOTFS_FILE}"
+    log_info "Built by: ${USER_NAME}"
     log_info "Parameter validasi selesai"
 }
 
@@ -161,6 +163,7 @@ run_ulo_build() {
     log_info "RootFS File: ${ROOTFS_FILE}"
     log_info "Patch File: ${PATCH_FILE:-None}"
     log_info "Firmware Size: ${FIRMWARE_SIZE}MB"
+    log_info "Built by: ${USER_NAME}"
     
     # Final check for custom rootfs in ULO-Builder/rootfs
     if [[ -f "ULO-Builder/rootfs/${ROOTFS_FILE}" ]]; then
@@ -199,16 +202,25 @@ run_ulo_build() {
             # Create output directory
             mkdir -p ../ulo-output
             
-            # Copy only .img.gz files to avoid duplicates
-            find out -name "*.img.gz" -exec cp {} ../ulo-output/ \;
+            # Create sanitized user name for filename (replace spaces and special chars)
+            SAFE_USER_NAME=$(echo "${USER_NAME}" | tr ' ' '_' | sed 's/[^a-zA-Z0-9_-]//g')
+            
+            # Copy and rename files to include user name
+            find out -name "*.img.gz" | while read file; do
+                filename=$(basename "$file")
+                # Insert user name before the file extension
+                new_filename="${filename%.img.gz}_by_${SAFE_USER_NAME}.img.gz"
+                cp "$file" "../ulo-output/$new_filename"
+                log_success "Built: $new_filename"
+            done
             
             # Also copy .img files if they exist
-            find out -name "*.img" -exec cp {} ../ulo-output/ \; 2>/dev/null || true
-            
-            # List output files
-            log_info "Output files:"
-            find ../ulo-output -name "*.img.gz" -o -name "*.img" | while read file; do
-                log_success "Built: $(basename "$file")"
+            find out -name "*.img" | while read file; do
+                filename=$(basename "$file")
+                # Insert user name before the file extension
+                new_filename="${filename%.img}_by_${SAFE_USER_NAME}.img"
+                cp "$file" "../ulo-output/$new_filename" 2>/dev/null || true
+                log_success "Built: $new_filename"
             done
             
             log_success "Output files copied to ../ulo-output/"

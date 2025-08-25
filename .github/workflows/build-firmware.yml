@@ -69,6 +69,10 @@ on:
         description: 'Patch filename (optional, ULO-Builder only)'
         required: false
         default: ''
+      build_id:
+        description: 'Unique build ID for tracking'
+        required: false
+        default: ''
 
 jobs:
   build:
@@ -171,7 +175,8 @@ jobs:
             "${{ github.event.inputs.kernel_version }}" \
             "$ROOTFS_FILE" \
             "$PATCH_FILE" \
-            "${{ github.event.inputs.firmware_size }}"
+            "${{ github.event.inputs.firmware_size }}" \
+            "${{ github.event.inputs.build_id }}"
           
           echo "ULO-Builder completed successfully!"
 
@@ -199,7 +204,8 @@ jobs:
           ./scripts/ophub-builder.sh \
             "${{ github.event.inputs.target_device }}" \
             "$ROOTFS_FILE" \
-            "${{ github.event.inputs.firmware_size }}"
+            "${{ github.event.inputs.firmware_size }}" \
+            "${{ github.event.inputs.build_id }}"
           
           echo "Ophub Builder completed successfully!"
 
@@ -208,11 +214,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.builder_type }}-${{ github.event.inputs.target_device }}-${{ github.run_number }}
-          name: "[${{ github.event.inputs.builder_type }}] ${{ github.event.inputs.target_device }} | #${{ github.run_number }}"
+          name: "[${{ github.event.inputs.builder_type }}] ${{ github.event.inputs.target_device }} | #${{ github.run_number }} | Build: ${{ github.event.inputs.build_id }}"
           body: |
             🚀 **Firmware Build Otomatis**
             
-            **Builder Information:**
+            **Build Information:**
+            - **Build ID**: ${{ github.event.inputs.build_id }}
+            - **Build Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
             - **Builder Type**: ${{ github.event.inputs.builder_type == 'ulo' && 'ULO-Builder' || 'Ophub Builder' }}
             - **Target Device**: ${{ github.event.inputs.target_device }}
             ${{ github.event.inputs.builder_type == 'ulo' && format('- **Kernel Version**: {0}', github.event.inputs.kernel_version) || '' }}
